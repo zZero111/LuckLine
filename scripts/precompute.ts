@@ -4,6 +4,7 @@
 // Writes:
 //   supabase/seed.sql               badge catalogue (committed)
 //   supabase/seed/number_stats.csv  number,ep,tier,badge_ids (gitignored)
+//   lib/badges/stats.json           badge odds + EP distribution for the UI (committed)
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -88,4 +89,22 @@ for (let i = 0; i < TOTAL_NUMBERS; i++) {
 }
 writeFileSync(csvPath, lines.join("\n") + "\n");
 
-console.log(`Wrote supabase/seed.sql and supabase/seed/number_stats.csv in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+// --- stats.json (client-side odds and percentiles) ---------------------------
+// epAtLeast: [ep, how many numbers score >= ep] for each distinct EP, ascending.
+const epCounts = new Map<number, number>();
+for (let i = 0; i < TOTAL_NUMBERS; i++) epCounts.set(eps[i], (epCounts.get(eps[i]) ?? 0) + 1);
+const distinct = [...epCounts.keys()].sort((a, b) => a - b);
+let atLeast = TOTAL_NUMBERS;
+const epAtLeast: [number, number][] = [];
+for (const ep of distinct) {
+  epAtLeast.push([ep, atLeast]);
+  atLeast -= epCounts.get(ep)!;
+}
+const statsJson = {
+  total: TOTAL_NUMBERS,
+  badgeCounts: Object.fromEntries(stats.map((st) => [st.badge.slug, st.count])),
+  epAtLeast,
+};
+writeFileSync(join(root, "lib/badges/stats.json"), JSON.stringify(statsJson) + "\n");
+
+console.log(`Wrote supabase/seed.sql, lib/badges/stats.json and supabase/seed/number_stats.csv in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
