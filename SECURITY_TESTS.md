@@ -16,7 +16,7 @@ Result after the fix round: **no open Critical or High findings.** The attack su
 |---|---|---|---|
 | ATK-01 | — | Signed-out reads of rolls, profiles, number_stats, roll_badges, leaderboard_totals, both views and `auth.users` all denied | Pass |
 | ATK-02 | — | Signed-out cannot call `roll_today` or `delete_my_account` (no EXECUTE for anon) | Pass |
-| ATK-03 | — | Player insert/update/upsert/delete on rolls, roll_badges, leaderboard_totals, badges, number_stats: all denied, row counts unchanged | Pass |
+| ATK-03 | — | Player insert/update/upsert/delete on rolls, roll_badges, leaderboard_totals, ep_wallets, badges, number_stats: all denied, row counts unchanged | Pass |
 | ATK-04 | — | Player A cannot update, delete or impersonate player B's profile | Pass |
 | ATK-05 | — | Second `roll_today` on the same UTC day fails ("already rolled today") | Pass |
 | ATK-06 | — | 20 parallel `roll_today` calls by one player leave exactly 1 row (UNIQUE(user_id, roll_date)) | Pass |
@@ -25,6 +25,9 @@ Result after the fix round: **no open Critical or High findings.** The attack su
 | ATK-09 | — | Player A cannot read B's past rolls or any of B's roll_badges (only today's leaderboard rows are visible) | Pass |
 | ATK-10 | — | Players cannot change their profile `id` or `created_at` (column-level grants) | Pass |
 | ATK-11 | — | Display names containing HTML, quotes or control characters are rejected by the check constraint | Pass |
+| ATK-12 | — | (EP rework) Signed-out cannot call `reroll_today`; a player reads only their own `ep_wallets` row; `private.*` helpers (`record_roll`, `rescore_all`, price/limit) are not executable by clients | Pass |
+| ATK-13 | — | (EP rework) Reroll before rolling or with 99 EP fails and changes nothing; `reroll_today` takes no arguments and has no overloads | Pass |
+| ATK-14 | — | (EP rework) 20 parallel rerolls by a player with 1M EP: exactly 3 succeed, `spent_ep` grows by exactly 300, EP earned matches the rolls, the day's score is its best roll, and the player shows once on today's leaderboard | Pass |
 | E2E-01 | — | Magic link → confirm page (button, no GET verification) → display name → roll → leaderboard → profile works; a reused link shows "Link expired or already used" | Pass |
 | E2E-02 | Low | Header kept showing "Choose a name" after sign-in or name creation (stale cached layout) | Fixed: `revalidatePath('/', 'layout')` in auth actions |
 | E2E-03 | Low | `upgrade-insecure-requests` and HSTS broke local HTTP calls to Supabase in `next start` | Fixed: only sent when the Supabase URL is HTTPS |

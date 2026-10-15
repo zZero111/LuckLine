@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { BADGES, epFor, matchBadges, rarityFor, scoreNumber, tierFromShares, tiersForEps } from "./index";
+import stats from "./stats.json";
+import { BADGES, TOTAL_NUMBERS, bestPerFamily, epFor, matchBadges, rarityFor, scoreNumber, tierFromShares, tiersForEps } from "./index";
+
+// Real EP per badge, from the generated stats (fast: no full scan).
+const counts = stats.badgeCounts as Record<string, number>;
+const realEp = new Map(BADGES.map((b) => [b.id, epFor(counts[b.slug] / TOTAL_NUMBERS)]));
+const bySlug = new Map(BADGES.map((b) => [b.slug, b.id]));
 
 const slugsOf = (n: number) => {
   const ids = new Set(matchBadges(n));
@@ -60,13 +66,79 @@ describe("badge tests", () => {
     expect(slugsOf(1000)).toContain("cubed");
   });
   it("a plain number gets nothing", () => {
-    expect(matchBadges(182635)).toEqual([]);
-    expect(scoreNumber(182635, new Map()).ep).toBe(0);
+    expect(matchBadges(102062)).toEqual([]);
+    expect(scoreNumber(102062, new Map()).ep).toBe(0);
   });
   it("scoreNumber sums badge EP", () => {
     const ep = new Map(BADGES.map((b) => [b.id, b.id * 10]));
     const r = scoreNumber(1337, ep);
     expect(r.ep).toBe(r.badgeIds.reduce((t, id) => t + id * 10, 0));
+  });
+});
+
+describe("families", () => {
+  it("every badge has a family slug", () => {
+    for (const b of BADGES) expect(b.family).toMatch(/^[a-z0-9-]{1,40}$/);
+  });
+  it("only the best badge per family counts", () => {
+    // 77777: double-take, triplet, quartet, quintet and monochrome all match; monochrome wins.
+    const ids = scoreNumber(77777, realEp).badgeIds;
+    expect(ids).toContain(bySlug.get("monochrome"));
+    for (const slug of ["double-take", "triplet", "quartet", "quintet"]) expect(ids).not.toContain(bySlug.get(slug));
+    // Different families still stack.
+    expect(ids).toContain(bySlug.get("jackpot"));
+  });
+  it("ties in a family keep the lowest id", () => {
+    const ep = new Map(BADGES.map((b) => [b.id, 1]));
+    const pal = BADGES.filter((b) => b.family === "palindrome").map((b) => b.id);
+    expect(bestPerFamily(pal, ep)).toEqual([Math.min(...pal)]);
+  });
+  it("EP of a roll is the sum of its counted badges", () => {
+    for (const n of [0, 42, 1337, 123456, 777777, 1_000_000]) {
+      const r = scoreNumber(n, realEp);
+      expect(r.ep).toBe(r.badgeIds.reduce((t, id) => t + realEp.get(id)!, 0));
+    }
+  });
+  it("stats.json is in sync with the catalogue (run npm run precompute)", () => {
+    expect(Object.keys(counts).sort()).toEqual(BADGES.map((b) => b.slug).sort());
+    for (const b of BADGES) expect(counts[b.slug]).toBeGreaterThan(0);
+  });
+});
+
+describe("new badges", () => {
+  const has = (n: number, slug: string) => matchBadges(n).includes(bySlug.get(slug)!);
+  it("maths", () => {
+    expect(has(153, "narcissist")).toBe(true);
+    expect(has(8128, "perfect")).toBe(true);
+    expect(has(46656, "sixth-power")).toBe(true);
+    expect(has(729, "tripling")).toBe(true);
+    expect(has(40320, "factorial")).toBe(true);
+    expect(has(10301, "prime-mirror")).toBe(true);
+    expect(has(13, "emirp")).toBe(true);
+    expect(has(11, "emirp")).toBe(false);
+    expect(has(41, "twin-prime")).toBe(true);
+  });
+  it("shapes and digits", () => {
+    expect(has(13862, "mountain")).toBe(true);
+    expect(has(85148, "valley")).toBe(true);
+    expect(has(121212, "ping-pong")).toBe(true);
+    expect(has(418418, "copycat")).toBe(true);
+    expect(has(777377, "odd-one-out")).toBe(true);
+    expect(has(110011, "binary")).toBe(true);
+    expect(has(456789, "full-flight")).toBe(true);
+  });
+  it("dates and times", () => {
+    expect(has(311299, "date-stamp")).toBe(true);
+    expect(has(310299, "date-stamp")).toBe(false); // 31 Feb
+    expect(has(235959, "clockwork")).toBe(true);
+    expect(has(246000, "clockwork")).toBe(false);
+  });
+  it("memes and constants", () => {
+    expect(has(9001, "over-nine-thousand")).toBe(true);
+    expect(has(314159, "perfect-pi")).toBe(true);
+    expect(has(271828, "eulers-number")).toBe(true);
+    expect(has(161803, "golden-ratio")).toBe(true);
+    expect(has(140404, "not-found")).toBe(true);
   });
 });
 
@@ -82,12 +154,12 @@ describe("rarity and EP", () => {
     expect(rarityFor(0.00001)).toBe("mythic");
     expect(rarityFor(1 / 1_000_001)).toBe("mythic");
   });
-  it("EP formula", () => {
+  it("EP formula: EP is the 1-in-N odds", () => {
     expect(epFor(1)).toBe(1);
-    expect(epFor(0.5)).toBe(10);
-    expect(epFor(0.25)).toBe(20);
-    expect(epFor(0.001)).toBe(100);
-    expect(epFor(1 / 1_000_001)).toBe(199);
+    expect(epFor(0.5)).toBe(2);
+    expect(epFor(0.25)).toBe(4);
+    expect(epFor(0.001)).toBe(1000);
+    expect(epFor(1 / 1_000_001)).toBe(1_000_001);
   });
 });
 

@@ -116,6 +116,7 @@ async function main() {
       "number_stats",
       "roll_badges",
       "leaderboard_totals",
+      "ep_wallets",
       "leaderboard_today",
       "leaderboard_all_time",
     ]) {
@@ -168,6 +169,7 @@ async function main() {
         select 'r'||id||user_id||roll_date||number||ep||tier as x from public.rolls where user_id in (${sqlStr(A.id)}, ${sqlStr(B.id)})
         union all select 'rb'||rb.roll_id||'-'||rb.badge_id from public.roll_badges rb join public.rolls r on r.id = rb.roll_id where r.user_id in (${sqlStr(A.id)}, ${sqlStr(B.id)})
         union all select 'lt'||user_id||total_ep||best_ep||roll_count from public.leaderboard_totals where user_id in (${sqlStr(A.id)}, ${sqlStr(B.id)})
+        union all select 'w'||user_id||earned_ep||spent_ep from public.ep_wallets where user_id in (${sqlStr(A.id)}, ${sqlStr(B.id)})
         union all select 'b'||id||slug||name||ep||probability from public.badges
         union all select 'ns'||number||ep||tier||badge_ids::text from public.number_stats where number in (0, 7, 777777, 1000000)
       ) s`);
@@ -197,6 +199,10 @@ async function main() {
       ["upsert leaderboard_totals", db.from("leaderboard_totals").upsert({ user_id: A.id, total_ep: 9e9, best_ep: 999999, roll_count: 1 }).select()],
       ["update leaderboard_totals", db.from("leaderboard_totals").update({ total_ep: 9e9 }).eq("user_id", A.id).select()],
       ["delete leaderboard_totals (B)", db.from("leaderboard_totals").delete().eq("user_id", B.id).select()],
+      ["insert ep_wallets", db.from("ep_wallets").insert({ user_id: A.id, earned_ep: 9e9 }).select()],
+      ["upsert ep_wallets", db.from("ep_wallets").upsert({ user_id: A.id, earned_ep: 9e9, spent_ep: 0 }).select()],
+      ["update own ep_wallets", db.from("ep_wallets").update({ earned_ep: 9e9, spent_ep: 0 }).eq("user_id", A.id).select()],
+      ["delete B ep_wallets", db.from("ep_wallets").delete().eq("user_id", B.id).select()],
       ["insert badges", db.from("badges").insert({ id: 32000, slug: "atk-x", name: "x", emoji: "x", description: "x", rarity: "mythic", probability: 1, ep: 1 }).select()],
       ["update badges", db.from("badges").update({ ep: 999999 }).gte("id", 0).select()],
       ["delete badges", db.from("badges").delete().gte("id", 0).select()],
@@ -425,6 +431,69 @@ async function main() {
     }
     const n = psql(`select count(*) from public.profiles where display_name ~ '[<>"''&]'`);
     c.expect(n === "0", `${n} profiles contain HTML metacharacters`);
+    c.done();
+  }
+
+  // ---------------------------------------------------------------- ATK-12
+  {
+    const c = new Check("ATK-12", "wallets are private and rerolls need sign-in");
+    const r = await anon.rpc("reroll_today");
+    c.expect(!!r.error, `anon rpc reroll_today: ${describe(r)}`);
+    const priv = psql(`select has_function_privilege('anon', 'public.reroll_today()', 'EXECUTE')`);
+    c.expect(priv === "f", "anon has EXECUTE on reroll_today()");
+    const mine = await A.client.from("ep_wallets").select("user_id");
+    c.expect(!mine.error && (mine.data ?? []).every((w) => w.user_id === A.id), `A reads wallets: ${describe(mine)}`);
+    const theirs = await A.client.from("ep_wallets").select("*").eq("user_id", B.id);
+    c.expect(deniedRead(theirs), `A reads B's wallet: ${describe(theirs)}`);
+    for (const fn of ["record_roll(uuid,date,smallint)", "rescore_all()", "reroll_price()", "max_rerolls()"]) {
+      const p = psql(`select has_function_privilege('authenticated', 'private.${fn}', 'EXECUTE')`);
+      c.expect(p === "f", `authenticated has EXECUTE on private.${fn}`);
+    }
+    c.done();
+  }
+
+  // ---------------------------------------------------------------- ATK-13
+  {
+    const c = new Check("ATK-13", "reroll without enough EP fails and changes nothing");
+    const G = await newPlayer("g");
+    const first = await G.client.rpc("reroll_today");
+    c.expect(!!first.error, `reroll before rolling: ${describe(first)}`);
+    await G.client.rpc("roll_today");
+    psql(`update public.ep_wallets set earned_ep = 99, spent_ep = 0 where user_id = ${sqlStr(G.id)}`); // 1 EP short
+    const before = psql(`select (select count(*) from public.rolls where user_id = ${sqlStr(G.id)})||','||balance from public.ep_wallets where user_id = ${sqlStr(G.id)}`);
+    const poor = await G.client.rpc("reroll_today");
+    c.expect(!!poor.error && /not enough EP/.test(poor.error.message), `reroll with 99 EP: ${describe(poor)}`);
+    const after = psql(`select (select count(*) from public.rolls where user_id = ${sqlStr(G.id)})||','||balance from public.ep_wallets where user_id = ${sqlStr(G.id)}`);
+    c.expect(before === after, `rolls/balance changed: ${before} -> ${after}`);
+    for (const args of [{ number: 7 }, { price: 0 }, { attempt: 1 }]) {
+      const r = await G.client.rpc("reroll_today", args);
+      c.expect(!!r.error, `rpc reroll_today(${JSON.stringify(args)}): ${describe(r)}`);
+    }
+    const procs = psql("select string_agg(p.oid::regprocedure::text, ',') from pg_proc p where p.proname = 'reroll_today'");
+    c.expect(procs === "reroll_today()", `reroll_today signatures: ${procs}`);
+    c.done();
+  }
+
+  // ---------------------------------------------------------------- ATK-14
+  {
+    const c = new Check("ATK-14", "20 parallel rerolls by a rich player: max 3 succeed, each charged once");
+    const H = await newPlayer("h");
+    await H.client.rpc("roll_today");
+    psql(`update public.ep_wallets set earned_ep = earned_ep + 1000000 where user_id = ${sqlStr(H.id)}`);
+    const w0 = psql(`select earned_ep||','||spent_ep from public.ep_wallets where user_id = ${sqlStr(H.id)}`).split(",").map(Number);
+    const res = await Promise.all(Array.from({ length: 20 }, () => H.client.rpc("reroll_today")));
+    const ok = res.filter((r) => !r.error);
+    c.expect(ok.length === 3, `${ok.length} of 20 rerolls succeeded (errors: ${[...new Set(res.filter((r) => r.error).map((r) => r.error!.message))].join("; ")})`);
+    const rows = psql(`select count(*)||','||max(attempt) from public.rolls where user_id = ${sqlStr(H.id)}`);
+    c.expect(rows === "4,3", `rolls count,max attempt = ${rows}`);
+    const gained = Number(psql(`select coalesce(sum(ep), 0) from public.rolls where user_id = ${sqlStr(H.id)} and attempt > 0`));
+    const w1 = psql(`select earned_ep||','||spent_ep from public.ep_wallets where user_id = ${sqlStr(H.id)}`).split(",").map(Number);
+    c.expect(w1[1] - w0[1] === 300, `spent_ep grew by ${w1[1] - w0[1]}, expected 300`);
+    c.expect(w1[0] - w0[0] === gained, `earned_ep grew by ${w1[0] - w0[0]}, rerolls earned ${gained}`);
+    const day = psql(`select t.total_ep = (select max(ep) from public.rolls where user_id = ${sqlStr(H.id)}) and t.roll_count = 1 from public.leaderboard_totals t where user_id = ${sqlStr(H.id)}`);
+    c.expect(day === "t", "leaderboard total is not the day's best roll / roll_count != 1");
+    const lb = await H.client.from("leaderboard_today").select("display_name").eq("display_name", H.name);
+    c.expect(!lb.error && lb.data?.length === 1, `H appears ${lb.data?.length} times on today's leaderboard`);
     c.done();
   }
 }

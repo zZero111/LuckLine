@@ -8,7 +8,7 @@ import { Chip } from "./Chip";
 import { Confetti } from "./Confetti";
 import { ShareButton } from "./ShareButton";
 import { SoundToggle } from "./SoundToggle";
-import { formatNumber, type RollResultData } from "./types";
+import { formatNumber, rollLabel, type RollResultData } from "./types";
 
 const SLOTS = 7; // 0 … 1,000,000 fits in seven digits: d,ddd,ddd
 
@@ -30,6 +30,8 @@ interface Props {
   /** Consecutive UTC days rolled, including this one. */
   streak?: number;
   onReplay?: () => void;
+  /** Called once the reveal has finished (straight away when not animating). */
+  onDone?: () => void;
 }
 
 interface Stage {
@@ -42,7 +44,7 @@ interface Stage {
 }
 
 /** The roll reveal: spinning reel, digit locks, tier slam, EP count-up, badges. */
-export function Reveal({ result, animate, newSlugs, streak, onReplay }: Props) {
+export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: Props) {
   const instant = !animate || prefersReducedMotion();
   const finalStage = useCallback(
     (r: RollResultData | null): Stage => ({
@@ -139,6 +141,10 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay }: Props) {
     };
   }, [result, instant, firstSignificant]);
 
+  useEffect(() => {
+    if (view.done) onDone?.();
+  }, [view.done, onDone]);
+
   function skip() {
     if (!result || view.done) return;
     timers.current.forEach((id) => window.clearTimeout(id));
@@ -168,7 +174,7 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay }: Props) {
 
       <div className="relative text-center">
         <p className="text-sm uppercase tracking-widest text-zinc-500">
-          {result ? `Your roll for ${result.roll_date}` : "Rolling…"}
+          {result ? `${result.attempt ? rollLabel(result.attempt) : "Your roll"} for ${result.roll_date}` : "Rolling…"}
         </p>
 
         {/* The reel */}
@@ -250,7 +256,7 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay }: Props) {
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <Chip value={b.rarity} />
-                  <span className="text-sm font-semibold tabular-nums text-violet-300">+{b.ep} EP</span>
+                  <span className="text-sm font-semibold tabular-nums text-violet-300">+{formatNumber(b.ep)} EP</span>
                 </div>
               </li>
             );

@@ -21,7 +21,7 @@ export function shareText(result: RollResultData, url: string, streak?: number) 
     .map((b) => tierSquare(b.rarity))
     .join("");
   const lines = [
-    `Luckline ${result.roll_date} 🎲 ${formatNumber(result.number)}`,
+    `Luckline ${result.roll_date} 🎲 ${formatNumber(result.number)}${result.attempt ? ` (reroll ${result.attempt})` : ""}`,
     `${capitalize(result.tier)} · ${formatNumber(result.ep)} EP ${tierSquare(result.tier)}`,
     squares || "no badges today",
     `${percentileLine(result.ep)}${streak && streak > 1 ? ` · 🔥${streak}` : ""}`,

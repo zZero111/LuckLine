@@ -39,11 +39,44 @@ psql "$LUCKLINE_DB" -v ON_ERROR_STOP=1 -f supabase/seed.sql
 psql "$LUCKLINE_DB" -v ON_ERROR_STOP=1 \
   -c "\copy public.number_stats from 'supabase/seed/number_stats.csv' csv"
 psql "$LUCKLINE_DB" -Atc "select (select count(*) from public.badges), (select count(*) from public.number_stats)"
-# expect: 30|1000001
+# expect: 96|1000001
 ```
 
 Badge ids are stable, so if you change the badges later, write a new
 migration. Don't edit the hosted tables by hand.
+
+### Upgrading a live database to the EP rework (96 badges, families, rerolls)
+
+For a project that is already running the original 30-badge version. Existing
+rolls are kept and rescored with the new EP values; every player's wallet starts
+with all the EP their past rolls earn under the new scale.
+
+```bash
+git pull && npm ci
+npx supabase db push        # applies 20261016120000_ep_rework_and_rerolls.sql
+npm run precompute          # regenerates supabase/seed.sql and the CSV (about 15 s)
+
+# One transaction: new badges, new number_stats, rescore everything.
+# If any step fails, nothing changes.
+psql "$LUCKLINE_DB" -1 -v ON_ERROR_STOP=1 \
+  -f supabase/seed.sql \
+  -c "truncate public.number_stats" \
+  -c "\copy public.number_stats from 'supabase/seed/number_stats.csv' csv" \
+  -c "select private.rescore_all()"
+
+psql "$LUCKLINE_DB" -Atc "select (select count(*) from public.badges), (select count(*) from public.number_stats), (select count(*) from public.ep_wallets)"
+# expect: 96|1000001|<number of players who have rolled>
+```
+
+Then merge the PR so the new site deploys. Between `db push` and the psql
+transaction (a minute or two) rolls still work and are rescored by
+`rescore_all()`; the old site keeps working against the new schema until the
+new one deploys.
+
+Reroll price and daily limit live in the database (`private.reroll_price()`,
+`private.max_rerolls()`, currently 100 EP and 3 per day). Change them with a
+new migration that redefines those two functions; the UI reads them through
+`reroll_terms()`.
 
 ## 3. Supabase dashboard
 
