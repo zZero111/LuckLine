@@ -25,14 +25,28 @@ export type Database = {
           Tables: {
             "badges": {
                   Row: {
-                    "description": string,"emoji": string,"ep": number,"id": number,"name": string,"probability": number,"rarity": string,"slug": string
+                    "description": string,"emoji": string,"ep": number,"family": string,"id": number,"name": string,"probability": number,"rarity": string,"slug": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "description": string,"emoji": string,"ep": number,"id": number,"name": string,"probability": number,"rarity": string,"slug": string
+                    "description": string,"emoji": string,"ep": number,"family"?: string,"id": number,"name": string,"probability": number,"rarity": string,"slug": string
                   }
                   Update: {
-                    "description"?: string,"emoji"?: string,"ep"?: number,"id"?: number,"name"?: string,"probability"?: number,"rarity"?: string,"slug"?: string
+                    "description"?: string,"emoji"?: string,"ep"?: number,"family"?: string,"id"?: number,"name"?: string,"probability"?: number,"rarity"?: string,"slug"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"ep_wallets": {
+                  Row: {
+                    "balance": number | null,"earned_ep": number,"spent_ep": number,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "balance"?: never,"earned_ep"?: number,"spent_ep"?: number,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "balance"?: never,"earned_ep"?: number,"spent_ep"?: number,"updated_at"?: string,"user_id"?: string
                   }
                   Relationships: [
                     
@@ -107,14 +121,14 @@ isOneToOne: false
                   ]
                 },"rolls": {
                   Row: {
-                    "created_at": string,"ep": number,"id": number,"number": number,"roll_date": string,"tier": string,"user_id": string
+                    "attempt": number,"created_at": string,"ep": number,"id": number,"number": number,"roll_date": string,"tier": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"ep": number,"id"?: never,"number": number,"roll_date"?: string,"tier": string,"user_id": string
+                    "attempt"?: number,"created_at"?: string,"ep": number,"id"?: never,"number": number,"roll_date"?: string,"tier": string,"user_id": string
                   }
                   Update: {
-                    "created_at"?: string,"ep"?: number,"id"?: never,"number"?: number,"roll_date"?: string,"tier"?: string,"user_id"?: string
+                    "attempt"?: number,"created_at"?: string,"ep"?: number,"id"?: never,"number"?: number,"roll_date"?: string,"tier"?: string,"user_id"?: string
                   }
                   Relationships: [
                     
@@ -143,6 +157,12 @@ isOneToOne: false
           Functions: {
             "delete_my_account":
 { Args: Record<PropertyKey, never>; Returns: undefined
+                           },
+"reroll_terms":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"reroll_today":
+{ Args: Record<PropertyKey, never>; Returns: Json
                            },
 "roll_today":
 { Args: Record<PropertyKey, never>; Returns: Json
