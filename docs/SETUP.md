@@ -20,6 +20,13 @@ npm run dev                        # http://127.0.0.1:3000; magic-link mail at h
 
 ## 2. Hosted database: schema, badges and number_stats
 
+> **Only build the hosted database from this repo's migration**
+> (`supabase/migrations/20261015120000_init_schema.sql`). The app expects its exact
+> tables, views (`leaderboard_today`, `leaderboard_all_time`, `leaderboard_totals`)
+> and the `roll_today()` return shape. If a different schema script was run in the
+> SQL Editor first, remove those objects before applying this one.
+
+
 Run these yourself. Use the **Session pooler** or direct connection string
 from Dashboard → Connect. Let psql prompt for the password; don't put it in
 shell history or in this repo.
@@ -46,23 +53,40 @@ migration. Don't edit the hosted tables by hand.
 | Database → Settings → SSL | Turn on **Enforce SSL on incoming connections**. |
 | Database → Settings → Network restrictions | Restrict direct DB access to the IPs you run psql/CI from. |
 | Auth → Sign In / Providers → Email | Email provider on. **Confirm email** on. **Email OTP expiration = 300** seconds. |
-| Auth → Email Templates → Magic Link *and* Confirm signup | Replace the link with `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email` (see `supabase/templates/magic_link.html`). The local `config.toml` setting is **not** pushed to the hosted project. |
+| Auth → Email Templates → Magic Link *and* Confirm signup | Replace the link with `{{ .SiteURL }}/auth/confirm/?token_hash={{ .TokenHash }}&type=email` (see `supabase/templates/magic_link.html`). The local `config.toml` setting is **not** pushed to the hosted project. |
 | Auth → SMTP | Configure custom SMTP. The built-in sender is rate-limited and for testing only. |
 | Auth → Attack Protection | Enable CAPTCHA (hCaptcha or Turnstile). The app does not send a captcha token yet, so wiring it into the login form is a follow-up. |
 | Auth → Rate Limits | Lower the email-sending and OTP verification limits (for example 30 emails/hour, 30 verifications per 5 min per IP). |
-| Auth → URL Configuration | **Site URL** = your default hosting URL (e.g. `https://<app>.vercel.app`). **Redirect URLs**: exact entries only, `https://<app>.vercel.app/auth/confirm`. No wildcards and no preview domains. |
+| Auth → URL Configuration | **Site URL** = `https://zzero111.github.io/RNGdle-2` (no trailing slash). **Redirect URLs**: exactly `https://zzero111.github.io/RNGdle-2/auth/confirm/` and nothing else. No wildcards. Local addresses belong in `supabase/config.toml` for the local stack only, not on the hosted project. |
 | Organization → Team | At least **two Owners** with MFA enabled. |
 | Database → Backups | Confirm daily backups are on; consider PITR. |
 
-Hosting env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-and `NEXT_PUBLIC_SITE_URL` (your exact default URL, used to build the
-magic-link redirect). Nothing else.
+Build settings: the GitHub Pages workflow reads `NEXT_PUBLIC_SUPABASE_URL` and
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from **GitHub → Settings → Secrets and
+variables → Actions → Variables** (they are public values, so Variables is fine).
+The workflow itself sets `NEXT_PUBLIC_BASE_PATH=/RNGdle-2`. Never add a secret key
+or the database password there.
 
 ## 4. GitHub
 
-- Settings → Branches: protect `main` (require a PR, at least 1 approval, no force pushes, no deletion).
+- Settings → Branches: protect the default branch (require a PR, at least 1 approval, no force pushes, no deletion).
 - Settings → Code security: enable **Secret scanning** and **Push protection**.
 - Enable **Dependabot alerts** and **Dependabot security updates**.
-- `.github/workflows/static.yml` (GitHub Pages deploy of the old static
-  prototype) uploads the whole repository as a static site. Delete it or
-  replace it now that the app is Next.js.
+- Settings → Pages → **Build and deployment → Source: GitHub Actions**.
+  `.github/workflows/deploy-pages.yml` builds the static site and deploys it to
+  `https://zzero111.github.io/RNGdle-2/` on every push to the default branch.
+  Pull requests build and test only. Free GitHub plans need a public repo for Pages.
+
+## 5. Static hosting: what changed and what is lost
+
+The app is a static export: there is no server. Sign-in, the roll and all data
+calls run in the browser against Supabase, and Row Level Security in the
+database is the protection. Compared with a server-hosted app:
+
+- GitHub Pages cannot send HTTP headers. The Content-Security-Policy and the
+  referrer policy are set with `<meta>` tags. `frame-ancestors`, `X-Frame-Options`,
+  `X-Content-Type-Options` and `Strict-Transport-Security` cannot be set this way.
+- The session token is kept in the browser's localStorage, so a script injected
+  into a page could read it. Display names are rendered as plain text for that reason.
+- Every site under the same `github.io` account shares one browser origin and
+  its storage. Do not host other apps on `zzero111.github.io` that you do not trust.

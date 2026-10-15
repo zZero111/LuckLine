@@ -43,9 +43,22 @@ Result after the fix round: **no open Critical or High findings.** The attack su
 
 ## Follow-ups (Medium / Low)
 
-1. **SCAN-07**: move to a nonce-based CSP set in `proxy.ts` and drop `'unsafe-inline'` from `script-src`.
+1. **SCAN-07**: the static export cannot use per-request nonces. Drop `'unsafe-inline'` from `script-src` only if Next can emit hash-based inline scripts; otherwise accept it.
 2. **FE-01**: expose today's leaderboard without `user_id`. Options: revoke the column with column grants plus an own-rows function for history, or serve "today" from a `leaderboard_today` table filled by `roll_today()`.
 3. **FE-02**: limit `profiles` SELECT to `id, display_name` via column grants, or move the leaderboard join into a definer function so `profiles` can be own-row only.
 4. **SCAN-01**: track `braces` / `eslint-config-next` for a fixed release.
 5. Wire CAPTCHA into the login form once it is enabled in the dashboard (see docs/SETUP.md).
 6. Tier "trash" is empty: 25.7% of numbers score 0 EP, so the bottom 1% cannot be separated. Decide on a rule (for example "0 EP = trash") if you want it populated.
+
+## Static export on GitHub Pages (changes after the security passes above)
+
+The attack suite and scans above ran against the earlier server-rendered build.
+The static export was written without being able to install dependencies or run
+the build, so it has not been re-tested. Before relying on it, re-run
+`npm run test:attacks` against a local stack and open the deployed site.
+
+| ID | Severity | What changed | Status |
+|---|---|---|---|
+| STATIC-01 | Medium | GitHub Pages cannot send `X-Frame-Options`, `frame-ancestors`, `nosniff` or HSTS. CSP and referrer policy are set with `<meta>` tags only. | Accepted |
+| STATIC-02 | Medium | Session token is in localStorage, readable by any script that runs on the page. | Accepted; display names are plain text |
+| STATIC-03 | Low | All sites under `zzero111.github.io` share one browser origin and storage. | Accepted; do not host untrusted apps there |
