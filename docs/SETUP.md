@@ -73,6 +73,19 @@ transaction (a minute or two) rolls still work and are rescored by
 `rescore_all()`; the old site keeps working against the new schema until the
 new one deploys.
 
+### Adding the Lucky Wheel
+
+One migration, no data to load:
+
+```bash
+git pull && npm ci
+npx supabase db push        # applies 20261017120000_lucky_wheel.sql
+```
+
+Then merge the PR. Existing rolls are untouched (each gets `multiplier = 1`).
+Prizes and odds live in `public.wheel_prizes` (the `weight` column; weights are
+relative, currently out of 1,000). Change them with a new migration.
+
 Reroll price and daily limit live in the database (`private.reroll_price()`,
 `private.max_rerolls()`, currently 100 EP and 3 per day). Change them with a
 new migration that redefines those two functions; the UI reads them through
