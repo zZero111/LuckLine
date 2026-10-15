@@ -603,6 +603,85 @@ async function main() {
     }
     c.done();
   }
+
+  // ---------------------------------------------------------------- ATK-17
+  {
+    const c = new Check("ATK-17", "avatars: own folder only, images only, 5 MB max, path must be your own");
+    // 1x1 transparent PNG.
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+    const P = await newPlayer("p");
+    const Q = await newPlayer("q");
+    const up = (cl: Client, path: string, body: Buffer | string, type: string, upsert = false) =>
+      cl.storage.from("avatars").upload(path, body, { contentType: type, upsert });
+
+    const own = await up(P.client, `${P.id}/avatar-1.png`, png, "image/png");
+    c.expect(!own.error, `upload own avatar: ${own.error?.message}`);
+    const setOwn = await P.client.from("profiles").update({ avatar_path: `${P.id}/avatar-1.png` }).eq("id", P.id).select();
+    c.expect(!setOwn.error && setOwn.data?.length === 1, `set own avatar_path: ${describe(setOwn)}`);
+    const qOwn = await up(Q.client, `${Q.id}/avatar-1.png`, png, "image/png");
+    c.expect(!qOwn.error, `Q uploads own avatar: ${qOwn.error?.message}`);
+
+    for (const [label, res] of [
+      ["upload into Q's folder", await up(P.client, `${Q.id}/avatar-2.png`, png, "image/png")],
+      ["overwrite Q's file", await up(P.client, `${Q.id}/avatar-1.png`, png, "image/png", true)],
+      ["upload as text/html", await up(P.client, `${P.id}/x.png`, "<script>alert(1)</script>", "text/html")],
+      ["upload SVG", await up(P.client, `${P.id}/x.svg`, "<svg xmlns='http://www.w3.org/2000/svg'/>", "image/svg+xml")],
+      ["upload .html name", await up(P.client, `${P.id}/x.html`, png, "image/png")],
+      ["path traversal name", await up(P.client, `${P.id}/../${Q.id}/avatar-9.png`, png, "image/png")],
+      ["upload over 5 MB", await up(P.client, `${P.id}/big.png`, Buffer.alloc(5 * 1024 * 1024 + 1), "image/png")],
+      ["signed-out upload", await up(anon, `${P.id}/anon.png`, png, "image/png")],
+    ] as const) {
+      c.expect(!!res.error, `${label} should fail`);
+    }
+    const delQ = await P.client.storage.from("avatars").remove([`${Q.id}/avatar-1.png`]);
+    c.expect((delQ.data ?? []).length === 0, `P deleted Q's file: ${JSON.stringify(delQ.data)}`);
+    c.expect(psql(`select count(*) from storage.objects where bucket_id = 'avatars' and name = '${Q.id}/avatar-1.png'`) === "1", "Q's file is gone");
+
+    const steal = await P.client.from("profiles").update({ avatar_path: `${Q.id}/avatar-1.png` }).eq("id", P.id).select();
+    c.expect(!!steal.error, `point own avatar_path at Q's file: ${describe(steal)}`);
+    const lock = await P.client.from("profiles").update({ avatar_locked: false }).eq("id", P.id).select();
+    c.expect(!!lock.error, `change own avatar_locked: ${describe(lock)}`);
+    const other = await P.client.from("profiles").update({ avatar_path: null }).eq("id", Q.id).select();
+    c.expect(!!other.error || (other.data ?? []).length === 0, `clear Q's avatar_path: ${describe(other)}`);
+
+    const pub = await fetch(`${URL}/storage/v1/object/public/avatars/${P.id}/avatar-1.png`);
+    c.expect(pub.ok && (pub.headers.get("content-type") ?? "").startsWith("image/png"), `public avatar URL: HTTP ${pub.status} ${pub.headers.get("content-type")}`);
+    c.done();
+
+    // ---------------------------------------------------------------- ATK-18
+    const d = new Check("ATK-18", "only admins can remove avatars; a removed avatar stays locked");
+    const notAdmin = await P.client.rpc("admin_remove_avatar", { target_name: Q.name });
+    d.expect(!!notAdmin.error, `non-admin admin_remove_avatar: ${describe(notAdmin)}`);
+    d.expect((await P.client.rpc("am_i_admin")).data === false, "P is reported as admin");
+    const adm = await P.client.from("admins").select("*");
+    d.expect(deniedRead(adm), `read admins table: ${describe(adm)}`);
+    const selfAdmin = await P.client.from("admins").insert({ user_id: P.id }).select();
+    d.expect(!!selfAdmin.error, `make self admin: ${describe(selfAdmin)}`);
+    const anonRm = await anon.rpc("admin_remove_avatar", { target_name: Q.name });
+    d.expect(!!anonRm.error, `anon admin_remove_avatar: ${describe(anonRm)}`);
+
+    psql(`update public.profiles set avatar_path = '${Q.id}/avatar-1.png' where id = ${sqlStr(Q.id)}`);
+    psql(`insert into public.admins (user_id) values (${sqlStr(A.id)}) on conflict do nothing`);
+    try {
+      d.expect((await A.client.rpc("am_i_admin")).data === true, "admin not recognised");
+      const rm = await A.client.rpc("admin_remove_avatar", { target_name: Q.name });
+      d.expect(!rm.error && rm.data === `${Q.id}/avatar-1.png`, `admin removes Q's avatar: ${describe(rm)}`);
+      const del = await A.client.storage.from("avatars").remove([`${Q.id}/avatar-1.png`]);
+      d.expect((del.data ?? []).length === 1, `admin deletes Q's file: ${del.error?.message ?? JSON.stringify(del.data)}`);
+      const q = psql(`select coalesce(avatar_path, 'null')||','||avatar_locked from public.profiles where id = ${sqlStr(Q.id)}`);
+      d.expect(q === "null,true", `Q profile after removal: ${q}`);
+      const again = await up(Q.client, `${Q.id}/avatar-2.png`, png, "image/png");
+      d.expect(!!again.error, "locked player re-uploaded an avatar");
+      const reset = await Q.client.from("profiles").update({ avatar_path: `${Q.id}/avatar-2.png` }).eq("id", Q.id).select();
+      d.expect(!!reset.error, `locked player set avatar_path: ${describe(reset)}`);
+    } finally {
+      psql(`delete from public.admins where user_id = ${sqlStr(A.id)}`);
+    }
+    // Deleting an account still works when the player has a file in Storage.
+    const delAcct = await P.client.rpc("delete_my_account");
+    d.expect(!delAcct.error, `delete_my_account with an avatar on file: ${describe(delAcct)}`);
+    d.done();
+  }
 }
 
 main()

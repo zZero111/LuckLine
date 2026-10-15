@@ -23,7 +23,21 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "badges": {
+            "admins": {
+                  Row: {
+                    "created_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"badges": {
                   Row: {
                     "description": string,"emoji": string,"ep": number,"family": string,"id": number,"name": string,"probability": number,"rarity": string,"slug": string
                   }
@@ -81,14 +95,14 @@ export type Database = {
                   ]
                 },"profiles": {
                   Row: {
-                    "created_at": string,"display_name": string,"id": string
+                    "avatar_locked": boolean,"avatar_path": string | null,"created_at": string,"display_name": string,"id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"display_name": string,"id": string
+                    "avatar_locked"?: boolean,"avatar_path"?: string | null,"created_at"?: string,"display_name": string,"id": string
                   }
                   Update: {
-                    "created_at"?: string,"display_name"?: string,"id"?: string
+                    "avatar_locked"?: boolean,"avatar_path"?: string | null,"created_at"?: string,"display_name"?: string,"id"?: string
                   }
                   Relationships: [
                     
@@ -178,7 +192,7 @@ isOneToOne: false
           Views: {
             "leaderboard_all_time": {
                   Row: {
-                    "best_ep": number | null,"display_name": string | null,"rank": number | null,"roll_count": number | null,"total_ep": number | null
+                    "avatar_path": string | null,"best_ep": number | null,"display_name": string | null,"rank": number | null,"roll_count": number | null,"total_ep": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -186,7 +200,7 @@ isOneToOne: false
                   ]
                 },"leaderboard_today": {
                   Row: {
-                    "bonus_ep": number | null,"display_name": string | null,"ep": number | null,"multiplier": number | null,"number": number | null,"rank": number | null,"tier": string | null
+                    "avatar_path": string | null,"bonus_ep": number | null,"display_name": string | null,"ep": number | null,"multiplier": number | null,"number": number | null,"rank": number | null,"tier": string | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -195,7 +209,13 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "delete_my_account":
+            "admin_remove_avatar":
+{ Args: { "target_name": string }; Returns: string
+                           },
+"am_i_admin":
+{ Args: Record<PropertyKey, never>; Returns: boolean
+                           },
+"delete_my_account":
 { Args: Record<PropertyKey, never>; Returns: undefined
                            },
 "reroll_terms":
