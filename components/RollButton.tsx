@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { RollResult } from "./RollResult";
 import type { RollResultData } from "./types";
@@ -26,8 +25,7 @@ function randomDigits() {
   return String(Math.floor(Math.random() * 1_000_001)).padStart(7, "0");
 }
 
-export function RollButton() {
-  const router = useRouter();
+export function RollButton({ onAlreadyRolled }: { onAlreadyRolled?: () => void }) {
   const [phase, setPhase] = useState<"idle" | "spinning" | "done">("idle");
   const [display, setDisplay] = useState("0000000");
   const [result, setResult] = useState<RollResultData | null>(null);
@@ -93,7 +91,7 @@ export function RollButton() {
             </Link>
           )}
           {error.refresh && (
-            <button type="button" onClick={() => router.refresh()} className="font-medium text-violet-300 underline">
+            <button type="button" onClick={() => onAlreadyRolled?.()} className="font-medium text-violet-300 underline">
               Show my result
             </button>
           )}

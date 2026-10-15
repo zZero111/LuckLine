@@ -1,0 +1,71 @@
+name: Build and deploy to GitHub Pages
+
+# Pull requests build and test only. Pushes to the default branch also deploy.
+on:
+  push:
+    branches: [claude/beautiful-cray-tm0pai]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      # next build also type-checks the project.
+      - name: Build static site
+        run: npm run build
+        env:
+          NEXT_PUBLIC_BASE_PATH: /RNGdle-2
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+
+      # Reported but not blocking until it has been seen passing on this setup.
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Fail if a secret key is in the build
+        run: |
+          if grep -rIlE "sb_secret_[A-Za-z0-9_-]{16,}" out; then
+            echo "Found a Supabase secret key in the build output" >&2
+            exit 1
+          fi
+
+      - name: Upload site
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
