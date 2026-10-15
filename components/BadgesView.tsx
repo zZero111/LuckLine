@@ -6,8 +6,9 @@ import { tierColor, tierRank } from "@/lib/game/tiers";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { createClient } from "@/lib/supabase/client";
 import { Chip } from "./Chip";
+import { formatNumber } from "./types";
 
-type CatalogBadge = { slug: string; name: string; emoji: string; description: string; rarity: string; ep: number };
+type CatalogBadge = { slug: string; name: string; emoji: string; family: string; description: string; rarity: string; ep: number };
 type Loaded = { badges: CatalogBadge[]; counts: Map<string, number> | null; failed: boolean };
 
 /** Every badge, rarest first. Earned ones light up with how many times you got them. */
@@ -20,7 +21,7 @@ export function BadgesView() {
     if (status === "loading") return;
     let cancelled = false;
     const supabase = createClient();
-    const catalog = supabase.from("badges").select("slug, name, emoji, description, rarity, ep");
+    const catalog = supabase.from("badges").select("slug, name, emoji, family, description, rarity, ep");
     const mine = userId
       ? supabase.from("rolls").select("roll_badges(badges(slug))").eq("user_id", userId).limit(1000)
       : Promise.resolve(null);
@@ -51,6 +52,8 @@ export function BadgesView() {
 
   const { badges, counts } = data;
   const collected = counts ? badges.filter((b) => counts.has(b.slug)).length : 0;
+  const familySize = new Map<string, number>();
+  for (const b of badges) familySize.set(b.family, (familySize.get(b.family) ?? 0) + 1);
 
   return (
     <>
@@ -69,6 +72,10 @@ export function BadgesView() {
       ) : (
         <p className="text-zinc-400">Sign in and roll to start your collection.</p>
       )}
+      <p className="text-sm text-zinc-500">
+        A badge&apos;s EP is its odds: a 1-in-5,000 badge pays 5,000 EP. Badges in the same family don&apos;t stack, so a
+        roll only scores the best one it hits in each family.
+      </p>
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {badges.map((b) => {
           const times = counts?.get(b.slug) ?? 0;
@@ -90,9 +97,12 @@ export function BadgesView() {
                   {owned && <span className="text-sm font-bold tabular-nums text-zinc-300">×{times}</span>}
                 </div>
                 <p className="text-xs text-zinc-400">{b.description}</p>
+                {(familySize.get(b.family) ?? 0) > 1 && (
+                  <p className="mt-1 text-[11px] text-zinc-500">Family: {b.family}</p>
+                )}
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <Chip value={b.rarity} />
-                  <span className="text-xs tabular-nums text-violet-300">{b.ep} EP</span>
+                  <span className="text-xs tabular-nums text-violet-300">{formatNumber(b.ep)} EP</span>
                   {odds && <span className="text-xs text-zinc-500">{formatOdds(odds)}</span>}
                 </div>
               </div>

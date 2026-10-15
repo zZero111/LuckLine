@@ -24,12 +24,13 @@ type Totals = { total_ep: number | null; best_ep: number | null; roll_count: num
 type HistoryRoll = {
   id: string | number;
   roll_date: string;
+  attempt: number;
   number: number;
   ep: number;
   tier: string;
   roll_badges: { badges: { emoji: string; ep: number } | null }[];
 };
-type Loaded = { userId: string; totals: Totals; rolls: HistoryRoll[]; failed: boolean };
+type Loaded = { userId: string; totals: Totals; balance: number; rolls: HistoryRoll[]; failed: boolean };
 
 export function ProfileView() {
   const router = useRouter();
@@ -49,15 +50,18 @@ export function ProfileView() {
       supabase.from("leaderboard_totals").select("total_ep, best_ep, roll_count").eq("user_id", userId).maybeSingle(),
       supabase
         .from("rolls")
-        .select("id, roll_date, number, ep, tier, roll_badges(badges(emoji, ep))")
+        .select("id, roll_date, attempt, number, ep, tier, roll_badges(badges(emoji, ep))")
         .eq("user_id", userId)
         .order("roll_date", { ascending: false })
+        .order("attempt", { ascending: false })
         .limit(100),
-    ]).then(([totals, rolls]) => {
+      supabase.from("ep_wallets").select("balance").eq("user_id", userId).maybeSingle(),
+    ]).then(([totals, rolls, wallet]) => {
       if (cancelled) return;
       setData({
         userId,
         totals: totals.data ?? null,
+        balance: Number(wallet.data?.balance ?? 0),
         rolls: (rolls.data ?? []) as HistoryRoll[],
         failed: !!rolls.error,
       });
@@ -69,15 +73,16 @@ export function ProfileView() {
 
   if (status !== "signedIn" || !data || data.userId !== userId) return skeleton;
 
-  const { totals, rolls, failed } = data;
+  const { totals, balance, rolls, failed } = data;
 
   return (
     <>
       <h1 className="text-3xl font-bold tracking-tight">{displayName ?? "Your profile"}</h1>
-      <div className="grid grid-cols-3 gap-3">
-        <Stat label="Total EP" value={formatNumber(totals?.total_ep ?? 0)} />
-        <Stat label="Best EP" value={formatNumber(totals?.best_ep ?? 0)} />
-        <Stat label="Rolls" value={formatNumber(totals?.roll_count ?? 0)} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Score (best per day)" value={formatNumber(totals?.total_ep ?? 0)} />
+        <Stat label="Best roll" value={formatNumber(totals?.best_ep ?? 0)} />
+        <Stat label="Days played" value={formatNumber(totals?.roll_count ?? 0)} />
+        <Stat label="EP to spend" value={`💰 ${formatNumber(balance)}`} />
       </div>
       <h2 className="text-xl font-semibold">History</h2>
       {failed ? (
@@ -99,9 +104,12 @@ export function ProfileView() {
             <tbody className="divide-y divide-zinc-800">
               {rolls.map((r) => (
                 <tr key={r.id}>
-                  <td className={`${td} tabular-nums text-zinc-400`}>{r.roll_date}</td>
+                  <td className={`${td} tabular-nums text-zinc-400`}>
+                    {r.roll_date}
+                    {r.attempt > 0 && <span className="ml-2 text-xs text-amber-300/80">reroll {r.attempt}</span>}
+                  </td>
                   <td className={`${td} text-right font-mono tabular-nums`}>{formatNumber(r.number)}</td>
-                  <td className={`${td} text-right tabular-nums text-violet-300`}>{r.ep}</td>
+                  <td className={`${td} text-right tabular-nums text-violet-300`}>{formatNumber(r.ep)}</td>
                   <td className={td}>
                     <Chip value={r.tier} />
                   </td>

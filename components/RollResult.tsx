@@ -10,10 +10,12 @@ export function RollResult({
   result,
   newSlugs,
   streak,
+  onDone,
 }: {
   result: RollResultData;
   newSlugs?: ReadonlySet<string>;
   streak?: number;
+  onDone?: () => void;
 }) {
   const [replay, setReplay] = useState(0);
   return (
@@ -23,6 +25,7 @@ export function RollResult({
       animate={replay > 0}
       newSlugs={newSlugs}
       streak={streak}
+      onDone={onDone}
       onReplay={() => {
         sfx.unlock();
         window.scrollTo({ top: 0, behavior: "smooth" });
