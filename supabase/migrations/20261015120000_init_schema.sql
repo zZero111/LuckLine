@@ -88,6 +88,16 @@ alter table public.rolls              enable row level security;
 alter table public.roll_badges        enable row level security;
 alter table public.leaderboard_totals enable row level security;
 
+-- The table owner (postgres) has BYPASSRLS (checked locally: rolbypassrls = t),
+-- so forcing RLS does not break the SECURITY DEFINER functions, and it keeps
+-- RLS in force for any non-bypass owner context.
+alter table public.badges             force row level security;
+alter table public.number_stats       force row level security;
+alter table public.profiles           force row level security;
+alter table public.rolls              force row level security;
+alter table public.roll_badges        force row level security;
+alter table public.leaderboard_totals force row level security;
+
 -- Start from zero: Supabase's default privileges grant everything to anon
 -- and authenticated, so revoke and grant back only what is needed.
 revoke all on public.badges, public.number_stats, public.profiles, public.rolls,
