@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RNGdle – Daily Random Number Game</title>
+<meta name="description" content="One roll a day, 0 to 1,000,000. Collect badges for the patterns hiding in your number and score Exclusivity Points.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>RNG<span>dle</span></h1>
+  <nav>
+    <button data-tab="play" class="active">Daily</button>
+    <button data-tab="badges">Badges</button>
+    <button data-tab="tools">Tools</button>
+    <button data-tab="about">About</button>
+  </nav>
+</header>
+
+<main>
+  <section id="play" class="tab active">
+    <p class="sub">One roll per day. Everyone gets the same number.</p>
+    <div id="numberBox" class="numberBox" aria-live="polite">??????</div>
+    <button id="rollBtn" class="primary">Roll today's number</button>
+    <div id="result" hidden>
+      <div class="ep">Total <b id="epTotal">0</b> EP</div>
+      <div id="earned" class="badgeList"></div>
+      <div class="row">
+        <button id="shareBtn">Share result</button>
+        <span id="shareMsg" class="muted"></span>
+      </div>
+    </div>
+    <div class="stats">
+      <div><b id="stDays">0</b><span>Days played</span></div>
+      <div><b id="stStreak">0</b><span>Streak</span></div>
+      <div><b id="stBest">0</b><span>Best EP</span></div>
+      <div><b id="stBadges">0</b><span>Badges found</span></div>
+    </div>
+    <p class="muted center">Next roll in <span id="countdown">--:--:--</span> (UTC midnight)</p>
+  </section>
+
+  <section id="badges" class="tab">
+    <h2>Badge collection</h2>
+    <p class="muted">Rarity is computed exactly by checking all 1,000,001 possible numbers. EP = 1 ÷ chance. Badges in the same family don't stack: only the best one counts.</p>
+    <div id="badgeSummary" class="muted"></div>
+    <div id="badgeGrid" class="badgeGrid"></div>
+  </section>
+
+  <section id="tools" class="tab">
+    <h2>Rarity calculator</h2>
+    <p class="muted">Enter any number from 0 to 1,000,000 to see what it would score.</p>
+    <div class="row">
+      <input id="calcInput" type="number" min="0" max="1000000" placeholder="e.g. 123456">
+      <button id="calcBtn">Check</button>
+    </div>
+    <div id="calcOut" class="badgeList"></div>
+    <hr>
+    <h2>Practice roll</h2>
+    <p class="muted">A random roll that doesn't count toward your daily stats.</p>
+    <button id="practiceBtn">Roll for fun</button>
+    <div id="practiceNum" class="numberBox small"></div>
+    <div id="practiceOut" class="badgeList"></div>
+    <hr>
+    <button id="resetBtn" class="danger">Reset my saved data</button>
+  </section>
+
+  <section id="about" class="tab">
+    <h2>How to play</h2>
+    <ol>
+      <li>Roll once per day (resets at UTC midnight). The number is between 0 and 1,000,000.</li>
+      <li>Your number is scanned for patterns: primes, palindromes, round numbers, sequences and more.</li>
+      <li>Each matching badge earns Exclusivity Points (EP) — the rarer the pattern, the more EP.</li>
+      <li>Share your result and chase streaks and a full badge collection.</li>
+    </ol>
+    <p class="muted">Fan recreation inspired by rngdle.com. Not affiliated.</p>
+  </section>
+</main>
+<script src="badges.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
