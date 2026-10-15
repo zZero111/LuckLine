@@ -67,6 +67,7 @@ create table public.roll_badges (
   badge_id smallint not null references public.badges (id),
   primary key (roll_id, badge_id)
 );
+create index roll_badges_badge_id_idx on public.roll_badges (badge_id);
 
 create table public.leaderboard_totals (
   user_id    uuid primary key references auth.users (id) on delete cascade,
