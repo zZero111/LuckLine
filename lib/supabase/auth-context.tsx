@@ -19,20 +19,29 @@ interface AuthValue {
   user: User | null;
   /** undefined while loading, null when the signed-in player has not picked a name yet. */
   displayName: string | null | undefined;
+  /** Storage path of the player's profile picture, if any. */
+  avatarPath: string | null;
+  /** True when an admin removed the player's picture; uploads are blocked. */
+  avatarLocked: boolean;
   refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
 
-type ProfileState = { userId: string; displayName: string | null };
+type ProfileFields = { displayName: string | null; avatarPath: string | null; avatarLocked: boolean };
+type ProfileState = { userId: string } & ProfileFields;
 
-async function fetchDisplayName(userId: string): Promise<string | null> {
+async function fetchProfile(userId: string): Promise<ProfileFields> {
   const { data } = await createClient()
     .from("profiles")
-    .select("display_name")
+    .select("display_name, avatar_path, avatar_locked")
     .eq("id", userId)
     .maybeSingle();
-  return data?.display_name ?? null;
+  return {
+    displayName: data?.display_name ?? null,
+    avatarPath: data?.avatar_path ?? null,
+    avatarLocked: data?.avatar_locked ?? false,
+  };
 }
 
 /**
@@ -55,8 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
-    fetchDisplayName(userId).then((displayName) => {
-      if (!cancelled) setProfile({ userId, displayName });
+    fetchProfile(userId).then((fields) => {
+      if (!cancelled) setProfile({ userId, ...fields });
     });
     return () => {
       cancelled = true;
@@ -65,15 +74,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = useCallback(async () => {
     if (!userId) return;
-    const displayName = await fetchDisplayName(userId);
-    setProfile({ userId, displayName });
+    const fields = await fetchProfile(userId);
+    setProfile({ userId, ...fields });
   }, [userId]);
 
   const value = useMemo<AuthValue>(() => {
     const user = session?.user ?? null;
     const status: Status = session === undefined ? "loading" : user ? "signedIn" : "signedOut";
-    const displayName = !user ? null : profile?.userId === user.id ? profile.displayName : undefined;
-    return { status, user, displayName, refreshProfile };
+    const mine = user && profile?.userId === user.id ? profile : null;
+    const displayName = !user ? null : mine ? mine.displayName : undefined;
+    return {
+      status,
+      user,
+      displayName,
+      avatarPath: mine?.avatarPath ?? null,
+      avatarLocked: mine?.avatarLocked ?? false,
+      refreshProfile,
+    };
   }, [session, profile, refreshProfile]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

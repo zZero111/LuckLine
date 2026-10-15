@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import type { Database } from "@/lib/database.types";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { createClient } from "@/lib/supabase/client";
+import { AVATAR_BUCKET } from "@/lib/avatars";
+import { Avatar } from "./Avatar";
 import { Chip } from "./Chip";
 import { SignInPrompt } from "./SignInPrompt";
 import { formatNumber, wheelTag } from "./types";
@@ -31,12 +33,69 @@ function Tabs({ tab, onChange }: { tab: "today" | "all"; onChange: (t: "today" |
   );
 }
 
+/** Avatar + name; admins also get a button to remove the picture. */
+function PlayerCell({
+  name,
+  avatarPath,
+  isAdmin,
+  onRemoved,
+}: {
+  name: string | null;
+  avatarPath: string | null;
+  isAdmin: boolean;
+  onRemoved: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  async function remove() {
+    if (!name || !window.confirm(`Remove ${name}'s profile picture? They won't be able to upload a new one.`)) return;
+    setBusy(true);
+    const supabase = createClient();
+    const { data: path, error } = await supabase.rpc("admin_remove_avatar", { target_name: name });
+    if (!error && path) await supabase.storage.from(AVATAR_BUCKET).remove([path]);
+    setBusy(false);
+    if (error) window.alert("Couldn't remove that picture.");
+    else onRemoved();
+  }
+  return (
+    <span className="flex items-center gap-2">
+      <Avatar path={avatarPath} name={name} size={28} />
+      <span className="truncate">{name}</span>
+      {isAdmin && avatarPath && (
+        <button
+          type="button"
+          onClick={remove}
+          disabled={busy}
+          title="Remove this profile picture (admin)"
+          className="rounded px-1.5 text-xs text-rose-300 hover:bg-rose-950 disabled:opacity-50"
+        >
+          {busy ? "…" : "🗑"}
+        </button>
+      )}
+    </span>
+  );
+}
+
 export function LeaderboardView() {
   const { status, user } = useAuth();
   const [tab, setTab] = useState<"today" | "all">("today");
   const [today, setToday] = useState<Loaded<TodayRow> | undefined>(undefined);
   const [allTime, setAllTime] = useState<Loaded<AllTimeRow> | undefined>(undefined);
   const userId = user?.id;
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [reload, setReload] = useState(0);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    createClient()
+      .rpc("am_i_admin")
+      .then(({ data }) => {
+        if (!cancelled) setIsAdmin(data === true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (!userId || tab !== "today") return;
@@ -52,7 +111,7 @@ export function LeaderboardView() {
     return () => {
       cancelled = true;
     };
-  }, [userId, tab]);
+  }, [userId, tab, reload]);
 
   useEffect(() => {
     if (!userId || tab !== "all") return;
@@ -68,7 +127,7 @@ export function LeaderboardView() {
     return () => {
       cancelled = true;
     };
-  }, [userId, tab]);
+  }, [userId, tab, reload]);
 
   if (status === "loading") return skeleton;
   if (status === "signedOut") return <SignInPrompt message="Sign in to see the leaderboard." />;
@@ -101,7 +160,9 @@ export function LeaderboardView() {
                 {today.rows.map((r, i) => (
                   <tr key={`${r.rank}-${r.display_name}-${i}`}>
                     <td className={`${td} tabular-nums text-zinc-500`}>{r.rank}</td>
-                    <td className={`${td} font-medium`}>{r.display_name}</td>
+                    <td className={`${td} font-medium`}>
+                      <PlayerCell name={r.display_name} avatarPath={r.avatar_path} isAdmin={isAdmin} onRemoved={() => setReload((n) => n + 1)} />
+                    </td>
                     <td className={`${td} text-right font-mono tabular-nums`}>{r.number != null ? formatNumber(r.number) : ""}</td>
                     <td className={`${td} text-right tabular-nums text-violet-300`}>
                       {r.ep != null ? formatNumber(r.ep) : ""}
@@ -136,7 +197,9 @@ export function LeaderboardView() {
               {allTime.rows.map((r, i) => (
                 <tr key={`${r.rank}-${r.display_name}-${i}`}>
                   <td className={`${td} tabular-nums text-zinc-500`}>{r.rank}</td>
-                  <td className={`${td} font-medium`}>{r.display_name}</td>
+                  <td className={`${td} font-medium`}>
+                    <PlayerCell name={r.display_name} avatarPath={r.avatar_path} isAdmin={isAdmin} onRemoved={() => setReload((n) => n + 1)} />
+                  </td>
                   <td className={`${td} text-right tabular-nums text-violet-300`}>{r.total_ep != null ? formatNumber(r.total_ep) : ""}</td>
                   <td className={`${td} text-right tabular-nums`}>{r.best_ep != null ? formatNumber(r.best_ep) : ""}</td>
                   <td className={`${td} text-right tabular-nums`}>{r.roll_count}</td>

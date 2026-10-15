@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { createClient } from "@/lib/supabase/client";
+import { Avatar } from "./Avatar";
 import { Chip } from "./Chip";
 import { formatNumber, wheelTag } from "./types";
 
@@ -36,7 +37,7 @@ type Loaded = { userId: string; totals: Totals; balance: number; rolls: HistoryR
 
 export function ProfileView() {
   const router = useRouter();
-  const { status, user, displayName } = useAuth();
+  const { status, user, displayName, avatarPath } = useAuth();
   const [data, setData] = useState<Loaded | null>(null);
   const userId = user?.id;
 
@@ -79,7 +80,10 @@ export function ProfileView() {
 
   return (
     <>
-      <h1 className="text-3xl font-bold tracking-tight">{displayName ?? "Your profile"}</h1>
+      <div className="flex items-center gap-4">
+        <Avatar path={avatarPath} name={displayName} size={64} />
+        <h1 className="text-3xl font-bold tracking-tight">{displayName ?? "Your profile"}</h1>
+      </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Score (best per day)" value={formatNumber(totals?.total_ep ?? 0)} />
         <Stat label="Best roll" value={formatNumber(totals?.best_ep ?? 0)} />

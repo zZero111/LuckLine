@@ -1,5 +1,7 @@
 "use client";
 
+import { AvatarUploader } from "@/components/AvatarUploader";
+import { AVATAR_BUCKET } from "@/lib/avatars";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
@@ -255,6 +257,11 @@ export function AccountPanel() {
 
   return (
     <div className="space-y-6">
+      <section>
+        <h2 className="mb-2 text-sm font-semibold text-zinc-300">Profile picture</h2>
+        <AvatarUploader />
+      </section>
+
       <dl className="space-y-2 text-sm">
         <div>
           <dt className="text-zinc-400">Email</dt>
@@ -301,6 +308,12 @@ function DeleteAccountForm() {
     }
     setPending(true);
     const supabase = createClient();
+    // Remove the player's pictures first: Storage files aren't deleted with the account.
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: files } = await supabase.storage.from(AVATAR_BUCKET).list(user.id);
+      if (files?.length) await supabase.storage.from(AVATAR_BUCKET).remove(files.map((f) => `${user.id}/${f.name}`));
+    }
     const { error } = await supabase.rpc("delete_my_account");
     if (error) {
       setState({ message: "Could not delete your account. Please try again." });

@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/supabase/auth-context";
+import { Avatar } from "./Avatar";
 
 /** Header user area. */
 export function UserArea() {
-  const { status, displayName } = useAuth();
+  const { status, displayName, avatarPath } = useAuth();
 
   if (status === "loading") {
     return <span className="h-8 w-20 animate-pulse rounded-lg bg-zinc-800" />;
@@ -22,7 +23,10 @@ export function UserArea() {
   return (
     <div className="flex items-center gap-3 text-sm">
       {displayName ? (
-        <span className="max-w-[10rem] truncate text-zinc-300">{displayName}</span>
+        <Link href="/account" className="flex items-center gap-2 text-zinc-300 hover:text-zinc-100">
+          <Avatar path={avatarPath} name={displayName} size={28} />
+          <span className="max-w-[10rem] truncate">{displayName}</span>
+        </Link>
       ) : displayName === null ? (
         <Link href="/welcome" className="text-violet-300 hover:text-violet-200">
           Choose a name
