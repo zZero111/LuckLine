@@ -5,7 +5,7 @@ import { BASE_PATH } from "@/lib/base-path";
 import { percentileLine } from "@/lib/game/odds";
 import { tierSquare } from "@/lib/game/tiers";
 import { capitalize } from "./Chip";
-import { formatNumber, type RollResultData } from "./types";
+import { formatNumber, wheelTag, type RollResultData } from "./types";
 
 /**
  * Example:
@@ -22,9 +22,9 @@ export function shareText(result: RollResultData, url: string, streak?: number) 
     .join("");
   const lines = [
     `Luckline ${result.roll_date} 🎲 ${formatNumber(result.number)}${result.attempt ? ` (reroll ${result.attempt})` : ""}`,
-    `${capitalize(result.tier)} · ${formatNumber(result.ep)} EP ${tierSquare(result.tier)}`,
+    `${capitalize(result.tier)} · ${formatNumber(result.ep)} EP ${tierSquare(result.tier)}${wheelTag(result.multiplier, result.bonus_ep) ? ` 🎡${wheelTag(result.multiplier, result.bonus_ep)}` : ""}`,
     squares || "no badges today",
-    `${percentileLine(result.ep)}${streak && streak > 1 ? ` · 🔥${streak}` : ""}`,
+    `${percentileLine(result.base_ep ?? result.ep)}${streak && streak > 1 ? ` · 🔥${streak}` : ""}`,
     url,
   ];
   return lines.join("\n");

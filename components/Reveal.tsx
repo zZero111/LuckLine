@@ -8,7 +8,7 @@ import { Chip } from "./Chip";
 import { Confetti } from "./Confetti";
 import { ShareButton } from "./ShareButton";
 import { SoundToggle } from "./SoundToggle";
-import { formatNumber, rollLabel, type RollResultData } from "./types";
+import { formatNumber, rollLabel, wheelTag, type RollResultData } from "./types";
 
 const SLOTS = 7; // 0 … 1,000,000 fits in seven digits: d,ddd,ddd
 
@@ -217,6 +217,12 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
                   {formatNumber(view.ep)} EP
                 </span>
               </div>
+              {wheelTag(result.multiplier, result.bonus_ep) && (
+                <p className="lk-fade rounded-full bg-amber-400/15 px-3 py-0.5 text-sm font-semibold text-amber-300">
+                  🎡 Lucky Wheel {wheelTag(result.multiplier, result.bonus_ep)}
+                  {result.base_ep != null && ` · ${formatNumber(result.base_ep)} → ${formatNumber(result.ep)} EP`}
+                </p>
+              )}
               <p className="lk-fade text-sm text-zinc-400">{tierHype(result.tier)}</p>
             </>
           )}
@@ -270,7 +276,7 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
       {/* Footer */}
       {result && view.done ? (
         <div className="lk-fade flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
-          <p className="text-sm text-zinc-300">{percentileLine(result.ep)}</p>
+          <p className="text-sm text-zinc-300">{percentileLine(result.base_ep ?? result.ep)}</p>
           {streak !== undefined && streak > 1 && (
             <p className="text-sm font-semibold text-orange-300">🔥 {streak}-day streak</p>
           )}

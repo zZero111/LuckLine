@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { Chip } from "./Chip";
-import { formatNumber, rollLabel, type RollResultData } from "./types";
+import { formatNumber, rollLabel, wheelTag, type RollResultData } from "./types";
 
 interface Props {
   balance: number;
   price: number;
   rerollsLeft: number;
   maxPerDay: number;
+  /** A free reroll from the Lucky Wheel is waiting. */
+  freeAvailable?: boolean;
   /** All of today's rolls, in order. */
   rolls: RollResultData[];
   /** The roll currently on screen. */
@@ -18,10 +20,10 @@ interface Props {
 }
 
 /** Wallet, reroll button (with a confirm step) and today's rolls. */
-export function RerollPanel({ balance, price, rerollsLeft, maxPerDay, rolls, shown, onReroll, onShow }: Props) {
+export function RerollPanel({ balance, price, rerollsLeft, maxPerDay, freeAvailable, rolls, shown, onReroll, onShow }: Props) {
   const [confirming, setConfirming] = useState(false);
   const best = rolls.reduce((a, b) => (b.ep > a.ep ? b : a), rolls[0]);
-  const canAfford = balance >= price;
+  const canAfford = freeAvailable || balance >= price;
   const canReroll = canAfford && rerollsLeft > 0;
 
   return (
@@ -43,7 +45,13 @@ export function RerollPanel({ balance, price, rerollsLeft, maxPerDay, rolls, sho
       ) : confirming ? (
         <div className="flex flex-col items-center gap-2">
           <p className="text-sm text-zinc-300">
-            Spend <span className="font-bold text-amber-300">{formatNumber(price)} EP</span> on another roll?
+            {freeAvailable ? (
+              <>Use your <span className="font-bold text-amber-300">free reroll</span>?</>
+            ) : (
+              <>
+                Spend <span className="font-bold text-amber-300">{formatNumber(price)} EP</span> on another roll?
+              </>
+            )}
           </p>
           <div className="flex gap-2">
             <button
@@ -73,7 +81,7 @@ export function RerollPanel({ balance, price, rerollsLeft, maxPerDay, rolls, sho
             onClick={() => setConfirming(true)}
             className="w-full rounded-xl bg-amber-400 px-5 py-3 text-lg font-black text-zinc-950 transition enabled:hover:bg-amber-300 enabled:active:scale-95 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
           >
-            🎲 Reroll · {formatNumber(price)} EP
+            {freeAvailable ? "🎁 Free reroll" : `🎲 Reroll · ${formatNumber(price)} EP`}
           </button>
           <p className="text-xs text-zinc-500">
             {canAfford
@@ -96,7 +104,12 @@ export function RerollPanel({ balance, price, rerollsLeft, maxPerDay, rolls, sho
               >
                 <span className="w-20 text-zinc-400">{rollLabel(r.attempt)}</span>
                 <span className="flex-1 font-mono tabular-nums">{formatNumber(r.number)}</span>
-                <span className="tabular-nums text-violet-300">{formatNumber(r.ep)} EP</span>
+                <span className="tabular-nums text-violet-300">
+                  {formatNumber(r.ep)} EP
+                  {wheelTag(r.multiplier, r.bonus_ep) && (
+                    <span className="ml-1 text-xs text-amber-300">{wheelTag(r.multiplier, r.bonus_ep)}</span>
+                  )}
+                </span>
                 <Chip value={r.tier} />
                 <span className="w-4" aria-label={r === best ? "best" : undefined}>
                   {r === best ? "⭐" : ""}
