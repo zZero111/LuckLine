@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "precompute": "tsx scripts/precompute.ts"
+    "precompute": "tsx scripts/precompute.ts",
+    "test:attacks": "tsx security/attacks.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
