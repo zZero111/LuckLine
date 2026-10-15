@@ -86,6 +86,34 @@ Then merge the PR. Existing rolls are untouched (each gets `multiplier = 1`).
 Prizes and odds live in `public.wheel_prizes` (the `weight` column; weights are
 relative, currently out of 1,000). Change them with a new migration.
 
+### Adding profile pictures
+
+One migration:
+
+```bash
+git pull && npm ci
+npx supabase db push        # applies 20261018120000_avatars.sql (creates the "avatars" bucket)
+```
+
+Then merge the PR.
+
+**Make yourself an admin** so you can remove pictures. In the dashboard's SQL
+Editor, with the email you sign in with:
+
+```sql
+insert into public.admins (user_id)
+select id from auth.users where email = 'you@example.com';
+```
+
+Admins see a 🗑 button next to every picture on the leaderboard. Removing a
+picture also stops that player uploading a new one. To let them upload again:
+
+```sql
+update public.profiles set avatar_locked = false where display_name = 'TheirName';
+```
+
+To remove an admin: `delete from public.admins where user_id = (select id from auth.users where email = 'you@example.com');`
+
 Reroll price and daily limit live in the database (`private.reroll_price()`,
 `private.max_rerolls()`, currently 100 EP and 3 per day). Change them with a
 new migration that redefines those two functions; the UI reads them through
