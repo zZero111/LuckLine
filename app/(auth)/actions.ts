@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSiteOrigin } from "@/lib/supabase/origin";
 import { createClient } from "@/lib/supabase/server";
@@ -57,6 +58,8 @@ export async function confirmSignIn(_prev: FormState, formData: FormData): Promi
   } catch {
     return failed;
   }
+  // Session changed: drop cached layouts so the header shows the new user.
+  revalidatePath("/", "layout");
   redirect(destination);
 }
 
@@ -90,12 +93,14 @@ export async function createProfile(_prev: FormState, formData: FormData): Promi
     }
     return { message: "Could not save that name. Please try again." };
   }
+  revalidatePath("/", "layout");
   redirect("/");
 }
 
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
+  revalidatePath("/", "layout");
   redirect("/");
 }
 
@@ -116,5 +121,6 @@ export async function deleteAccount(_prev: FormState, formData: FormData): Promi
   }
   // The auth user is gone; clear the local session cookies.
   await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+  revalidatePath("/", "layout");
   redirect("/");
 }
