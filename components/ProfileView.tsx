@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { createClient } from "@/lib/supabase/client";
 import { Chip } from "./Chip";
-import { formatNumber } from "./types";
+import { formatNumber, wheelTag } from "./types";
 
 const th = "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500";
 const td = "px-3 py-2";
@@ -26,6 +26,8 @@ type HistoryRoll = {
   roll_date: string;
   attempt: number;
   number: number;
+  multiplier: number;
+  bonus_ep: number;
   ep: number;
   tier: string;
   roll_badges: { badges: { emoji: string; ep: number } | null }[];
@@ -50,7 +52,7 @@ export function ProfileView() {
       supabase.from("leaderboard_totals").select("total_ep, best_ep, roll_count").eq("user_id", userId).maybeSingle(),
       supabase
         .from("rolls")
-        .select("id, roll_date, attempt, number, ep, tier, roll_badges(badges(emoji, ep))")
+        .select("id, roll_date, attempt, number, ep, multiplier, bonus_ep, tier, roll_badges(badges(emoji, ep))")
         .eq("user_id", userId)
         .order("roll_date", { ascending: false })
         .order("attempt", { ascending: false })
@@ -109,7 +111,12 @@ export function ProfileView() {
                     {r.attempt > 0 && <span className="ml-2 text-xs text-amber-300/80">reroll {r.attempt}</span>}
                   </td>
                   <td className={`${td} text-right font-mono tabular-nums`}>{formatNumber(r.number)}</td>
-                  <td className={`${td} text-right tabular-nums text-violet-300`}>{formatNumber(r.ep)}</td>
+                  <td className={`${td} text-right tabular-nums text-violet-300`}>
+                    {formatNumber(r.ep)}
+                    {wheelTag(r.multiplier, r.bonus_ep) && (
+                      <span className="ml-1 text-xs text-amber-300">🎡{wheelTag(r.multiplier, r.bonus_ep)}</span>
+                    )}
+                  </td>
                   <td className={td}>
                     <Chip value={r.tier} />
                   </td>

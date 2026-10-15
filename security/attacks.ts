@@ -117,6 +117,7 @@ async function main() {
       "roll_badges",
       "leaderboard_totals",
       "ep_wallets",
+      "wheel_spins",
       "leaderboard_today",
       "leaderboard_all_time",
     ]) {
@@ -334,8 +335,8 @@ async function main() {
     const c = new Check("ATK-09", "A cannot read B's past roll history or B's roll_badges");
     // Fixture: backdated roll + badge for B, inserted as postgres.
     const backId = psql(
-      `insert into public.rolls (user_id, roll_date, number, ep, tier)
-       values (${sqlStr(B.id)}, ((now() at time zone 'utc')::date - 30), 424242, 5, 'common') returning id`,
+      `insert into public.rolls (user_id, roll_date, number, ep, base_ep, tier)
+       values (${sqlStr(B.id)}, ((now() at time zone 'utc')::date - 30), 424242, 5, 5, 'common') returning id`,
     ).split("\n")[0];
     const badgeId = psql("select min(id) from public.badges");
     psql(`insert into public.roll_badges (roll_id, badge_id) values (${backId}, ${badgeId})`);
@@ -494,6 +495,112 @@ async function main() {
     c.expect(day === "t", "leaderboard total is not the day's best roll / roll_count != 1");
     const lb = await H.client.from("leaderboard_today").select("display_name").eq("display_name", H.name);
     c.expect(!lb.error && lb.data?.length === 1, `H appears ${lb.data?.length} times on today's leaderboard`);
+    c.done();
+  }
+
+  // ---------------------------------------------------------------- ATK-15
+  {
+    const c = new Check("ATK-15", "wheel: sign-in needed, one spin a day, only after rolling, no arguments");
+    const r = await anon.rpc("spin_wheel");
+    c.expect(!!r.error, `anon rpc spin_wheel: ${describe(r)}`);
+    c.expect(psql(`select has_function_privilege('anon', 'public.spin_wheel()', 'EXECUTE')`) === "f", "anon has EXECUTE on spin_wheel()");
+    const prizes = await anon.from("wheel_prizes").select("slug");
+    c.expect(!prizes.error && (prizes.data ?? []).length >= 2, `anon can read the prize list: ${describe(prizes)}`);
+
+    const S = await newPlayer("s");
+    const early = await S.client.rpc("spin_wheel");
+    c.expect(!!early.error && /roll today first/.test(early.error.message), `spin before rolling: ${describe(early)}`);
+    await S.client.rpc("roll_today");
+    for (const args of [{ prize_id: 8 }, { prize: "jackpot" }, { multiplier: 10 }]) {
+      const a = await S.client.rpc("spin_wheel", args);
+      c.expect(!!a.error, `rpc spin_wheel(${JSON.stringify(args)}): ${describe(a)}`);
+    }
+    const res = await Promise.all(Array.from({ length: 20 }, () => S.client.rpc("spin_wheel")));
+    const ok = res.filter((x) => !x.error).length;
+    c.expect(ok === 1, `${ok} of 20 parallel spins succeeded (errors: ${[...new Set(res.filter((x) => x.error).map((x) => x.error!.message))].join("; ")})`);
+    c.expect(psql(`select count(*) from public.wheel_spins where user_id = ${sqlStr(S.id)}`) === "1", "more than one wheel_spins row");
+    const procs = psql("select string_agg(p.oid::regprocedure::text, ',') from pg_proc p where p.proname = 'spin_wheel'");
+    c.expect(procs === "spin_wheel()", `spin_wheel signatures: ${procs}`);
+
+    const theirs = await A.client.from("wheel_spins").select("*").eq("user_id", S.id);
+    c.expect(deniedRead(theirs), `A reads S's spin: ${describe(theirs)}`);
+    for (const [label, q] of [
+      ["insert wheel_spins", A.client.from("wheel_spins").insert({ user_id: A.id, spin_date: "2001-01-01", prize_id: 8, roll_id: 1, ep_before: 0, ep_after: 0 }).select()],
+      ["update own wheel_spins", S.client.from("wheel_spins").update({ free_reroll_used: false, prize_id: 8 }).eq("user_id", S.id).select()],
+      ["delete own wheel_spins", S.client.from("wheel_spins").delete().eq("user_id", S.id).select()],
+      ["update wheel_prizes", A.client.from("wheel_prizes").update({ weight: 1000000 }).eq("slug", "jackpot").select()],
+      ["insert wheel_prizes", A.client.from("wheel_prizes").insert({ id: 99, slug: "x", label: "x", kind: "multiplier", value: 100, weight: 1, color: "#000000", sort: 99 }).select()],
+      ["update own roll multiplier", S.client.from("rolls").update({ multiplier: 10 }).eq("user_id", S.id).select()],
+    ] as const) {
+      const x = await q;
+      c.expect(!!x.error || (x.data ?? []).length === 0, `${label}: ${describe(x)}`);
+    }
+    c.expect(psql(`select count(*) from public.wheel_spins where user_id = ${sqlStr(S.id)}`) === "1", "S's spin row was deleted");
+    c.done();
+  }
+
+  // ---------------------------------------------------------------- ATK-16
+  {
+    const c = new Check("ATK-16", "wheel prizes apply exactly: 3x, lose half (never below 0 EP), free reroll");
+    const weights = psql("select string_agg(id || ':' || weight, ',' order by id) from public.wheel_prizes");
+    const force = (slug: string) =>
+      psql(`update public.wheel_prizes set weight = case when slug = '${slug}' then 1000000000 else 1 end`);
+    try {
+      // 3x on a known roll.
+      const T = await newPlayer("t");
+      await T.client.rpc("roll_today");
+      psql(`update public.rolls set base_ep = 40, ep = 40 where user_id = ${sqlStr(T.id)};
+            update public.ep_wallets set earned_ep = 40 where user_id = ${sqlStr(T.id)};
+            select 1 from public.leaderboard_totals where user_id = ${sqlStr(T.id)}`);
+      force("triple");
+      const sp = await T.client.rpc("spin_wheel");
+      const d = sp.data as { prize: { slug: string }; ep_before: number; ep_after: number } | null;
+      c.expect(!sp.error && d?.prize.slug === "triple" && d.ep_before === 40 && d.ep_after === 120, `3x spin: ${describe(sp)}`);
+      const t = psql(`select r.ep||','||r.base_ep||','||r.multiplier||','||w.earned_ep||','||l.total_ep from public.rolls r
+        join public.ep_wallets w using (user_id) join public.leaderboard_totals l using (user_id) where r.user_id = ${sqlStr(T.id)}`);
+      c.expect(t === "120,40,3.00,120,120", `after 3x (ep,base,mult,earned,total): ${t}`);
+
+      // Lose half with almost everything already spent.
+      const L = await newPlayer("l");
+      await L.client.rpc("roll_today");
+      psql(`update public.rolls set base_ep = 1000, ep = 1000 where user_id = ${sqlStr(L.id)};
+            update public.ep_wallets set earned_ep = 1000, spent_ep = 990 where user_id = ${sqlStr(L.id)}`);
+      force("lose-half");
+      const lh = await L.client.rpc("spin_wheel");
+      c.expect(!lh.error && (lh.data as { ep_after: number }).ep_after === 500, `lose half: ${describe(lh)}`);
+      const lw = psql(`select earned_ep||','||spent_ep||','||balance from public.ep_wallets where user_id = ${sqlStr(L.id)}`);
+      c.expect(lw === "990,990,0", `wallet after losing half (earned,spent,balance): ${lw}`);
+
+      // Free reroll: works with 0 EP, costs nothing, and is on top of the 3 paid ones.
+      const F = await newPlayer("fr");
+      await F.client.rpc("roll_today");
+      psql(`update public.ep_wallets set earned_ep = 0, spent_ep = 0 where user_id = ${sqlStr(F.id)};
+            update public.rolls set base_ep = 0, ep = 0 where user_id = ${sqlStr(F.id)}`);
+      force("free-reroll");
+      const fs = await F.client.rpc("spin_wheel");
+      c.expect(!fs.error, `free-reroll spin: ${describe(fs)}`);
+      const free = await F.client.rpc("reroll_today");
+      c.expect(!free.error && (free.data as { free: boolean }).free === true, `free reroll with 0 EP: ${describe(free)}`);
+      c.expect(psql(`select spent_ep from public.ep_wallets where user_id = ${sqlStr(F.id)}`) === "0", "free reroll charged EP");
+      const poor = await F.client.rpc("reroll_today");
+      c.expect(!!poor.error, `second reroll with no EP should fail: ${describe(poor)}`);
+      psql(`update public.ep_wallets set earned_ep = earned_ep + 10000 where user_id = ${sqlStr(F.id)}`);
+      const paid = [];
+      for (let i = 0; i < 4; i++) paid.push(await F.client.rpc("reroll_today"));
+      c.expect(paid.slice(0, 3).every((x) => !x.error) && !!paid[3].error, `3 paid rerolls then refusal: ${paid.map((x) => (x.error ? x.error.message : "ok")).join(" / ")}`);
+      const fr = psql(`select count(*)||','||max(attempt)||','||(select spent_ep from public.ep_wallets where user_id = ${sqlStr(F.id)}) from public.rolls where user_id = ${sqlStr(F.id)}`);
+      c.expect(fr === "5,4,300", `rolls,max attempt,spent after free + 3 paid: ${fr}`);
+
+      // Rescoring keeps the wheel multiplier.
+      psql("select private.rescore_all()");
+      const kept = psql(`select ep = floor(base_ep * multiplier) + bonus_ep and multiplier = 3 from public.rolls where user_id = ${sqlStr(T.id)}`);
+      c.expect(kept === "t", "rescore_all dropped the 3x multiplier");
+    } finally {
+      for (const pair of weights.split(",")) {
+        const [id, w] = pair.split(":");
+        psql(`update public.wheel_prizes set weight = ${Number(w)} where id = ${Number(id)}`);
+      }
+    }
     c.done();
   }
 }

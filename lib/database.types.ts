@@ -121,17 +121,57 @@ isOneToOne: false
                   ]
                 },"rolls": {
                   Row: {
-                    "attempt": number,"created_at": string,"ep": number,"id": number,"number": number,"roll_date": string,"tier": string,"user_id": string
+                    "attempt": number,"base_ep": number,"bonus_ep": number,"created_at": string,"ep": number,"id": number,"multiplier": number,"number": number,"roll_date": string,"tier": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "attempt"?: number,"created_at"?: string,"ep": number,"id"?: never,"number": number,"roll_date"?: string,"tier": string,"user_id": string
+                    "attempt"?: number,"base_ep": number,"bonus_ep"?: number,"created_at"?: string,"ep": number,"id"?: never,"multiplier"?: number,"number": number,"roll_date"?: string,"tier": string,"user_id": string
                   }
                   Update: {
-                    "attempt"?: number,"created_at"?: string,"ep"?: number,"id"?: never,"number"?: number,"roll_date"?: string,"tier"?: string,"user_id"?: string
+                    "attempt"?: number,"base_ep"?: number,"bonus_ep"?: number,"created_at"?: string,"ep"?: number,"id"?: never,"multiplier"?: number,"number"?: number,"roll_date"?: string,"tier"?: string,"user_id"?: string
                   }
                   Relationships: [
                     
+                  ]
+                },"wheel_prizes": {
+                  Row: {
+                    "color": string,"id": number,"kind": string,"label": string,"slug": string,"sort": number,"value": number,"weight": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "color": string,"id": number,"kind": string,"label": string,"slug": string,"sort": number,"value"?: number,"weight": number
+                  }
+                  Update: {
+                    "color"?: string,"id"?: number,"kind"?: string,"label"?: string,"slug"?: string,"sort"?: number,"value"?: number,"weight"?: number
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"wheel_spins": {
+                  Row: {
+                    "created_at": string,"ep_after": number,"ep_before": number,"free_reroll_used": boolean,"prize_id": number,"roll_id": number,"spin_date": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"ep_after": number,"ep_before": number,"free_reroll_used"?: boolean,"prize_id": number,"roll_id": number,"spin_date": string,"user_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"ep_after"?: number,"ep_before"?: number,"free_reroll_used"?: boolean,"prize_id"?: number,"roll_id"?: number,"spin_date"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "wheel_spins_prize_id_fkey"
+      columns: ["prize_id"]
+isOneToOne: false
+      referencedRelation: "wheel_prizes"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "wheel_spins_roll_id_fkey"
+      columns: ["roll_id"]
+isOneToOne: false
+      referencedRelation: "rolls"
+      referencedColumns: ["id"]
+    }
                   ]
                 }
           }
@@ -146,7 +186,7 @@ isOneToOne: false
                   ]
                 },"leaderboard_today": {
                   Row: {
-                    "display_name": string | null,"ep": number | null,"number": number | null,"rank": number | null,"tier": string | null
+                    "bonus_ep": number | null,"display_name": string | null,"ep": number | null,"multiplier": number | null,"number": number | null,"rank": number | null,"tier": string | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -165,6 +205,9 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: Json
                            },
 "roll_today":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"spin_wheel":
 { Args: Record<PropertyKey, never>; Returns: Json
                            }
           }

@@ -5,11 +5,12 @@ import { useCallback, useEffect, useState } from "react";
 import { sfx } from "@/lib/game/sfx";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/supabase/auth-context";
+import { LuckyWheel, type SpinOutcome } from "./LuckyWheel";
 import { RerollPanel } from "./RerollPanel";
 import { Reveal } from "./Reveal";
 import { RollButton, friendlyError } from "./RollButton";
 import { RollResult } from "./RollResult";
-import type { RollBadge, RollResultData } from "./types";
+import type { RollBadge, RollResultData, WheelPrize, WheelSpin } from "./types";
 
 /** Fallback if reroll_terms() can't be fetched; the database enforces the real values. */
 const DEFAULT_TERMS = { price: 100, max_per_day: 3 };
@@ -26,6 +27,9 @@ interface DayState {
   streakBefore: number;
   balance: number;
   terms: { price: number; max_per_day: number };
+  prizes: WheelPrize[];
+  /** Today's Lucky Wheel spin, if used. */
+  spin: WheelSpin | null;
 }
 
 function utcDay(offsetDays = 0) {
@@ -78,14 +82,23 @@ export function Play() {
     Promise.all([
       supabase
         .from("rolls")
-        .select("roll_date, attempt, number, ep, tier, roll_badges(badges(slug, name, emoji, description, rarity, ep))")
+        .select(
+          "roll_date, attempt, number, ep, base_ep, multiplier, bonus_ep, tier, roll_badges(badges(slug, name, emoji, description, rarity, ep))",
+        )
         .eq("user_id", userId)
         .order("roll_date", { ascending: false })
         .order("attempt", { ascending: true })
         .limit(500),
       supabase.from("ep_wallets").select("balance").eq("user_id", userId).maybeSingle(),
       supabase.rpc("reroll_terms"),
-    ]).then(([rollsRes, walletRes, termsRes]) => {
+      supabase.from("wheel_prizes").select("*").order("sort"),
+      supabase
+        .from("wheel_spins")
+        .select("prize_id, ep_before, ep_after, free_reroll_used, rolls(attempt)")
+        .eq("user_id", userId)
+        .eq("spin_date", today)
+        .maybeSingle(),
+    ]).then(([rollsRes, walletRes, termsRes, prizesRes, spinRes]) => {
       if (cancelled) return;
       const rolls: RollResultData[] = [];
       const earnedBefore = new Set<string>();
@@ -97,7 +110,17 @@ export function Play() {
           .filter((b): b is RollBadge => b !== null)
           .sort((a, b) => b.ep - a.ep);
         if (row.roll_date === today) {
-          rolls.push({ roll_date: row.roll_date, attempt: row.attempt, number: row.number, ep: row.ep, tier: row.tier, badges });
+          rolls.push({
+            roll_date: row.roll_date,
+            attempt: row.attempt,
+            number: row.number,
+            ep: row.ep,
+            base_ep: row.base_ep,
+            multiplier: Number(row.multiplier),
+            bonus_ep: row.bonus_ep,
+            tier: row.tier,
+            badges,
+          });
         } else {
           for (const b of badges) earnedBefore.add(b.slug);
         }
@@ -110,6 +133,16 @@ export function Play() {
         streakBefore: streakEndingAt(days, utcDay(-1)),
         balance: Number(walletRes.data?.balance ?? 0),
         terms,
+        prizes: ((prizesRes.data ?? []) as WheelPrize[]).map((p) => ({ ...p, value: Number(p.value) })),
+        spin: spinRes.data
+          ? {
+              prize_id: spinRes.data.prize_id,
+              attempt: spinRes.data.rolls?.attempt ?? 0,
+              ep_before: spinRes.data.ep_before,
+              ep_after: spinRes.data.ep_after,
+              free_reroll_used: spinRes.data.free_reroll_used,
+            }
+          : null,
       });
     });
     return () => {
@@ -118,6 +151,39 @@ export function Play() {
   }, [userId, hasProfile, reload]);
 
   const markDone = useCallback(() => setRevealDone(true), []);
+
+  async function spinWheel(): Promise<SpinOutcome> {
+    const { data, error: rpcError } = await createClient().rpc("spin_wheel");
+    if (rpcError || !data) throw new Error(friendlyError(rpcError?.message ?? "").text);
+    const r = data as unknown as Omit<SpinOutcome, "prize"> & { prize: { id: number } };
+    const prize = day?.prizes.find((p) => p.id === r.prize.id);
+    if (!prize) throw new Error("Unknown prize. Please refresh.");
+    return { ...r, prize };
+  }
+
+  function applySpin(o: SpinOutcome) {
+    setDay((d) => {
+      if (!d) return d;
+      const rolls = d.rolls.map((r) => {
+        if ((r.attempt ?? 0) !== o.attempt) return r;
+        const k = o.prize;
+        return {
+          ...r,
+          ep: o.ep_after,
+          multiplier: k.kind === "multiplier" ? k.value : r.multiplier,
+          bonus_ep: k.kind === "bonus" ? (r.bonus_ep ?? 0) + k.value : r.bonus_ep,
+        };
+      });
+      return {
+        ...d,
+        rolls,
+        balance: o.balance ?? d.balance,
+        spin: { prize_id: o.prize.id, attempt: o.attempt, ep_before: o.ep_before, ep_after: o.ep_after, free_reroll_used: false },
+      };
+    });
+    setLive(null);
+    setShownAttempt(o.attempt);
+  }
 
   async function roll(kind: "roll" | "reroll") {
     if (!day) return;
@@ -143,6 +209,7 @@ export function Play() {
         ...d,
         rolls: [...d.rolls.filter((r) => r.attempt !== result.attempt), result],
         balance: result.balance ?? d.balance,
+        spin: result.free && d.spin ? { ...d.spin, free_reroll_used: true } : d.spin,
       },
     );
     setShownAttempt(result.attempt ?? 0);
@@ -216,7 +283,10 @@ export function Play() {
   const latest = day.rolls[day.rolls.length - 1];
   const shown = day.rolls.find((r) => (r.attempt ?? 0) === shownAttempt) ?? latest;
   const lastAttempt = latest ? (latest.attempt ?? 0) : 0;
-  const rerollsLeft = day.terms.max_per_day - lastAttempt;
+  const spinPrize = day.spin ? day.prizes.find((p) => p.id === day.spin!.prize_id) : undefined;
+  const wonFreeReroll = spinPrize?.kind === "free_reroll";
+  const freeAvailable = wonFreeReroll && !day.spin!.free_reroll_used;
+  const rerollsLeft = day.terms.max_per_day + (wonFreeReroll ? 1 : 0) - lastAttempt;
 
   return (
     <div className="flex w-full flex-col items-center gap-8">
@@ -252,7 +322,8 @@ export function Play() {
           balance={day.balance}
           price={day.terms.price}
           rerollsLeft={rerollsLeft}
-          maxPerDay={day.terms.max_per_day}
+          maxPerDay={day.terms.max_per_day + (wonFreeReroll ? 1 : 0)}
+          freeAvailable={freeAvailable}
           rolls={day.rolls}
           shown={shown}
           onReroll={() => roll("reroll")}
@@ -260,6 +331,15 @@ export function Play() {
             setLive(null);
             setShownAttempt(attempt);
           }}
+        />
+      )}
+      {revealDone && latest && day.prizes.length > 0 && (
+        <LuckyWheel
+          prizes={day.prizes}
+          spin={day.spin}
+          target={day.spin ? null : { attempt: lastAttempt, number: latest.number, ep: latest.ep }}
+          onSpin={spinWheel}
+          onSettled={applySpin}
         />
       )}
     </div>

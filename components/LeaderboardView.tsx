@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/supabase/auth-context";
 import { createClient } from "@/lib/supabase/client";
 import { Chip } from "./Chip";
 import { SignInPrompt } from "./SignInPrompt";
-import { formatNumber } from "./types";
+import { formatNumber, wheelTag } from "./types";
 
 type TodayRow = Database["public"]["Views"]["leaderboard_today"]["Row"];
 type AllTimeRow = Database["public"]["Views"]["leaderboard_all_time"]["Row"];
@@ -103,7 +103,12 @@ export function LeaderboardView() {
                     <td className={`${td} tabular-nums text-zinc-500`}>{r.rank}</td>
                     <td className={`${td} font-medium`}>{r.display_name}</td>
                     <td className={`${td} text-right font-mono tabular-nums`}>{r.number != null ? formatNumber(r.number) : ""}</td>
-                    <td className={`${td} text-right tabular-nums text-violet-300`}>{r.ep}</td>
+                    <td className={`${td} text-right tabular-nums text-violet-300`}>
+                      {r.ep != null ? formatNumber(r.ep) : ""}
+                      {wheelTag(r.multiplier, r.bonus_ep) && (
+                        <span className="ml-1 text-xs text-amber-300">🎡{wheelTag(r.multiplier, r.bonus_ep)}</span>
+                      )}
+                    </td>
                     <td className={td}>
                       <Chip value={r.tier} />
                     </td>
@@ -133,7 +138,7 @@ export function LeaderboardView() {
                   <td className={`${td} tabular-nums text-zinc-500`}>{r.rank}</td>
                   <td className={`${td} font-medium`}>{r.display_name}</td>
                   <td className={`${td} text-right tabular-nums text-violet-300`}>{r.total_ep != null ? formatNumber(r.total_ep) : ""}</td>
-                  <td className={`${td} text-right tabular-nums`}>{r.best_ep}</td>
+                  <td className={`${td} text-right tabular-nums`}>{r.best_ep != null ? formatNumber(r.best_ep) : ""}</td>
                   <td className={`${td} text-right tabular-nums`}>{r.roll_count}</td>
                 </tr>
               ))}
