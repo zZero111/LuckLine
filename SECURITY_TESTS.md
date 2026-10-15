@@ -1,0 +1,51 @@
+# Security tests: Luckline MVP
+
+Run on 2026-10-15 against the local Supabase stack and a production build
+(`next build && next start`). Sources:
+
+- **ATK**: the scripted attack suite (`npm run test:attacks`, `security/attacks.ts`).
+- **SCAN**: advisors, lint, secret search, npm audit and build-output search.
+- **FE**: a black-box tester that never saw the source.
+- **E2E**: a manual end-to-end browser run.
+
+Result after the fix round: **no open Critical or High findings.** The attack suite was re-run after fixes and passed 11/11. Supabase `db lint` reports no errors, and `db advisors` reports only INFO items.
+
+## Findings
+
+| id | severity | what happened | status |
+|---|---|---|---|
+| ATK-01 | — | Signed-out reads of rolls, profiles, number_stats, roll_badges, leaderboard_totals, both views and `auth.users` all denied | Pass |
+| ATK-02 | — | Signed-out cannot call `roll_today` or `delete_my_account` (no EXECUTE for anon) | Pass |
+| ATK-03 | — | Player insert/update/upsert/delete on rolls, roll_badges, leaderboard_totals, badges, number_stats: all denied, row counts unchanged | Pass |
+| ATK-04 | — | Player A cannot update, delete or impersonate player B's profile | Pass |
+| ATK-05 | — | Second `roll_today` on the same UTC day fails ("already rolled today") | Pass |
+| ATK-06 | — | 20 parallel `roll_today` calls by one player leave exactly 1 row (UNIQUE(user_id, roll_date)) | Pass |
+| ATK-07 | — | `roll_today` takes no arguments; `{number: 7}`, `{n: 7}` and GET `?number=7` all fail; no overloads exist | Pass |
+| ATK-08 | — | Both views are `security_invoker = true`; anon has no SELECT on them | Pass |
+| ATK-09 | — | Player A cannot read B's past rolls or any of B's roll_badges (only today's leaderboard rows are visible) | Pass |
+| ATK-10 | — | Players cannot change their profile `id` or `created_at` (column-level grants) | Pass |
+| ATK-11 | — | Display names containing HTML, quotes or control characters are rejected by the check constraint | Pass |
+| E2E-01 | — | Magic link → confirm page (button, no GET verification) → display name → roll → leaderboard → profile works; a reused link shows "Link expired or already used" | Pass |
+| E2E-02 | Low | Header kept showing "Choose a name" after sign-in or name creation (stale cached layout) | Fixed: `revalidatePath('/', 'layout')` in auth actions |
+| E2E-03 | Low | `upgrade-insecure-requests` and HSTS broke local HTTP calls to Supabase in `next start` | Fixed: only sent when the Supabase URL is HTTPS |
+| FE-01 | Low (reported as High) | A signed-in user can read every player's rolls for **today** through REST, including `user_id` and `created_at`. The tester said past rolls leaked too; that was not reproduced (past-dated fixture rows stayed hidden), so this is the intended Today-leaderboard access | Accepted; follow-up below |
+| FE-02 | Low | A signed-in user can read all profiles (`id`, `display_name`, `created_at`). No email or other private data | Accepted; follow-up below |
+| FE-03…FE-15 | — | Email exposure, double roll, choosing the number, parameter injection, cross-user writes, stored XSS, open redirect, Host-header injection into the magic link, GET-only sign-in, anon RPC, admin endpoints, security headers: all blocked or passing | Pass |
+| SCAN-01 | High (dev-only) | `npm audit`: `braces` ≤3.0.3 stack-exhaustion DoS via `eslint-config-next` → `fast-glob`. No patched `braces` exists; the suggested fix is a downgrade to `eslint-config-next@14`, which is incompatible with Next 16. Only reachable through ESLint globs we write ourselves; `npm audit --omit=dev` reports 0 | Accepted risk; revisit when a fixed version ships |
+| SCAN-02 | Low | `security/attacks.ts` has fallback values for the local CLI's well-known default publishable key and DB URL | Accepted (local defaults, not secrets) |
+| SCAN-03 | Info | Advisor: `number_stats` has RLS with no policies | Intended: deny-all to clients |
+| SCAN-04 | Info | Advisor: unindexed FK `roll_badges.badge_id` | Fixed: index added in migration |
+| SCAN-05 | Info | Advisor: unused indexes on a fresh DB | No action |
+| SCAN-06 | Info | Build was made against local env; CSP `connect-src` follows `NEXT_PUBLIC_SUPABASE_URL` | Rebuild with hosted env when deploying |
+| SCAN-07 | Medium | CSP uses `'unsafe-inline'` for scripts and styles (static headers, no nonces) | Follow-up |
+| SCAN-08 | — | No `sb_secret_` key, JWT, DB password or private key in git history or `.next` output (string literals in supabase-js only); only `.env.example` (empty) is tracked | Pass |
+| SCAN-09 | — | gitleaks could not run (Docker Hub rate limit); a regex sweep over `git log -p --all` was used instead | Re-run gitleaks in GitHub secret scanning |
+
+## Follow-ups (Medium / Low)
+
+1. **SCAN-07**: move to a nonce-based CSP set in `proxy.ts` and drop `'unsafe-inline'` from `script-src`.
+2. **FE-01**: expose today's leaderboard without `user_id`. Options: revoke the column with column grants plus an own-rows function for history, or serve "today" from a `leaderboard_today` table filled by `roll_today()`.
+3. **FE-02**: limit `profiles` SELECT to `id, display_name` via column grants, or move the leaderboard join into a definer function so `profiles` can be own-row only.
+4. **SCAN-01**: track `braces` / `eslint-config-next` for a fixed release.
+5. Wire CAPTCHA into the login form once it is enabled in the dashboard (see docs/SETUP.md).
+6. Tier "trash" is empty: 25.7% of numbers score 0 EP, so the bottom 1% cannot be separated. Decide on a rule (for example "0 EP = trash") if you want it populated.
