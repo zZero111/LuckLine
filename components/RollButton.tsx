@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import { sfx } from "@/lib/game/sfx";
 import { createClient } from "@/lib/supabase/client";
-import { RollResult } from "./RollResult";
+import { Reveal } from "./Reveal";
+import { SoundToggle } from "./SoundToggle";
 import type { RollResultData } from "./types";
 
-const SPIN_MS = 1500;
+/** Minimum spin before the digits start locking, for suspense. */
+const SPIN_MS = 900;
 
 function friendlyError(message: string): { text: string; href?: string; label?: string; refresh?: boolean } {
   if (message.includes("already rolled today")) {
@@ -21,67 +24,71 @@ function friendlyError(message: string): { text: string; href?: string; label?: 
   return { text: "Something went wrong while rolling. Please try again." };
 }
 
-function randomDigits() {
-  return String(Math.floor(Math.random() * 1_000_001)).padStart(7, "0");
+interface Props {
+  onAlreadyRolled?: () => void;
+  /** Badge slugs the player had earned before today. */
+  earnedBefore?: ReadonlySet<string>;
+  /** Consecutive days rolled up to yesterday. */
+  streakBefore?: number;
 }
 
-export function RollButton({ onAlreadyRolled }: { onAlreadyRolled?: () => void }) {
-  const [phase, setPhase] = useState<"idle" | "spinning" | "done">("idle");
-  const [display, setDisplay] = useState("0000000");
+export function RollButton({ onAlreadyRolled, earnedBefore, streakBefore = 0 }: Props) {
+  const [phase, setPhase] = useState<"idle" | "rolling">("idle");
   const [result, setResult] = useState<RollResultData | null>(null);
+  const [replay, setReplay] = useState(0);
   const [error, setError] = useState<ReturnType<typeof friendlyError> | null>(null);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => () => {
-    if (timer.current) clearInterval(timer.current);
-  }, []);
 
   async function roll() {
+    sfx.unlock();
     setError(null);
-    setPhase("spinning");
-    timer.current = setInterval(() => setDisplay(randomDigits()), 60);
+    setPhase("rolling");
     const started = Date.now();
 
     const supabase = createClient();
     const { data, error: rpcError } = await supabase.rpc("roll_today");
-
-    const wait = Math.max(0, SPIN_MS - (Date.now() - started));
-    await new Promise((r) => setTimeout(r, rpcError ? 0 : wait));
-    if (timer.current) clearInterval(timer.current);
-    timer.current = null;
 
     if (rpcError || !data) {
       setError(friendlyError(rpcError?.message ?? ""));
       setPhase("idle");
       return;
     }
+    await new Promise((r) => setTimeout(r, Math.max(0, SPIN_MS - (Date.now() - started))));
     setResult(data as unknown as RollResultData);
-    setPhase("done");
   }
 
-  if (phase === "done" && result) {
+  if (phase === "rolling") {
+    const newSlugs = result && earnedBefore
+      ? new Set(result.badges.map((b) => b.slug).filter((slug) => !earnedBefore.has(slug)))
+      : undefined;
     return (
-      <div className="animate-[fadein_0.5s_ease-out] w-full">
-        <RollResult result={result} />
-      </div>
+      <Reveal
+        key={replay}
+        result={result}
+        animate
+        newSlugs={newSlugs}
+        streak={result ? streakBefore + 1 : undefined}
+        onReplay={() => {
+          sfx.unlock();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          setReplay((r) => r + 1);
+        }}
+      />
     );
   }
 
   return (
     <div className="flex flex-col items-center gap-6">
-      {phase === "spinning" ? (
-        <p className="font-mono text-6xl font-bold tabular-nums text-violet-300 blur-[1px] sm:text-7xl" aria-live="polite">
-          {display}
-        </p>
-      ) : (
-        <button
-          type="button"
-          onClick={roll}
-          className="rounded-2xl bg-violet-600 px-14 py-6 text-3xl font-bold text-white shadow-lg shadow-violet-900/50 transition hover:bg-violet-500 active:scale-95"
-        >
-          Roll
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={roll}
+        className="lk-pulse rounded-2xl bg-violet-600 px-16 py-7 text-4xl font-black tracking-wide text-white transition hover:scale-105 hover:bg-violet-500 active:scale-95"
+      >
+        ROLL
+      </button>
+      <p className="text-sm text-zinc-500">
+        {streakBefore > 0 ? `🔥 ${streakBefore}-day streak. Keep it going.` : "One shot. Make it count."}
+      </p>
+      <SoundToggle />
       {error && (
         <div role="alert" className="flex flex-col items-center gap-2 rounded-lg border border-rose-800 bg-rose-950/50 px-4 py-3 text-sm text-rose-200">
           <p>{error.text}</p>

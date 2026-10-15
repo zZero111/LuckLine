@@ -50,6 +50,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                   <Link href="/leaderboard" className="hover:text-zinc-100">
                     Leaderboard
                   </Link>
+                  <Link href="/badges" className="hover:text-zinc-100">
+                    Badges
+                  </Link>
                   <Link href="/profile" className="hover:text-zinc-100">
                     Profile
                   </Link>
