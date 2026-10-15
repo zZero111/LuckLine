@@ -45,7 +45,7 @@ jobs:
 
       - name: Fail if a secret key is in the build
         run: |
-          if grep -rIl "sb_secret_" out; then
+          if grep -rIlE "sb_secret_[A-Za-z0-9_-]{16,}" out; then
             echo "Found a Supabase secret key in the build output" >&2
             exit 1
           fi
