@@ -92,3 +92,41 @@ describe("expansion badges", () => {
     expect(has(3002, "birthday")).toBe(false); // 30 Feb
   });
 });
+
+describe("replacements for duplicate badges, and the 67 badges", () => {
+  it("old duplicate slugs are gone and replacements exist", () => {
+    for (const gone of ["penta-zeros", "zeros-takeover", "triple-sixes", "zeros-overload", "make-a-wish", "ninety-nine-problems"]) {
+      expect(bySlug.has(gone)).toBe(false);
+    }
+    for (const slug of ["square-mirror", "digit-factorials", "nine-lives", "mirror-image", "one-step-wonder", "product-power"]) {
+      expect(bySlug.has(slug)).toBe(true);
+    }
+  });
+  it("replacement badges", () => {
+    expect(has(26, "square-mirror")).toBe(true); // 26^2 = 676
+    expect(has(27, "square-mirror")).toBe(false); // 729
+    expect(has(145, "digit-factorials")).toBe(true);
+    expect(has(40585, "digit-factorials")).toBe(true);
+    expect(has(146, "digit-factorials")).toBe(false);
+    expect(has(729, "nine-lives")).toBe(true);
+    expect(has(730, "nine-lives")).toBe(false);
+    expect(has(818, "mirror-image")).toBe(true);
+    expect(has(819, "mirror-image")).toBe(false);
+    expect(has(29, "one-step-wonder")).toBe(true); // 29 + 92 = 121
+    expect(has(11, "one-step-wonder")).toBe(false); // palindromes are excluded
+    expect(has(999999, "product-power")).toBe(true);
+    expect(has(111111, "product-power")).toBe(false);
+  });
+  it("67", () => {
+    expect(has(167, "six-seven")).toBe(true);
+    expect(has(76, "six-seven")).toBe(false);
+    expect(has(67, "exactly-sixty-seven")).toBe(true);
+    expect(has(167, "exactly-sixty-seven")).toBe(false);
+  });
+  it("replaced slots keep their ids, new badges go at the end", () => {
+    expect(bySlug.get("square-mirror")).toBe(100); // was penta-zeros
+    expect(bySlug.get("one-step-wonder")).toBe(246); // was make-a-wish
+    expect(BADGES.at(-1)?.slug).toBe("exactly-sixty-seven");
+    expect(BADGES.at(-2)?.slug).toBe("six-seven");
+  });
+});

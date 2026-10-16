@@ -22,6 +22,23 @@ for (const st of stats) {
   if (st.count < 1) throw new Error(`badge ${st.badge.slug} matches no numbers`);
 }
 
+// Two badges that match exactly the same numbers are duplicates: refuse to ship them.
+{
+  const fingerprint = new Map<number, number>(stats.map((st) => [st.badge.id, 2166136261]));
+  for (let i = 0; i < TOTAL_NUMBERS; i++) {
+    for (const id of matches[i]) fingerprint.set(id, Math.imul(fingerprint.get(id)! ^ (i + 1), 16777619) >>> 0);
+  }
+  const seen = new Map<string, string>();
+  const clashes: string[] = [];
+  for (const st of stats) {
+    const key = `${st.count}:${fingerprint.get(st.badge.id)}`;
+    const other = seen.get(key);
+    if (other) clashes.push(`${other} = ${st.badge.slug}`);
+    else seen.set(key, st.badge.slug);
+  }
+  if (clashes.length) throw new Error(`Duplicate badges (identical match sets):\n  ${clashes.join("\n  ")}`);
+}
+
 // Only the best badge per family counts (see lib/badges/index.ts).
 const eps = new Int32Array(TOTAL_NUMBERS);
 const counted: number[][] = new Array(TOTAL_NUMBERS);
