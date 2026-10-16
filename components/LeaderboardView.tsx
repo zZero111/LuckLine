@@ -33,9 +33,20 @@ function Rank({ rank }: { rank: number | null }) {
   return <>{rank}</>;
 }
 
-/** Row tint: gold for first place, violet for you. */
+/** Gold, silver and bronze for the top three. */
+const PODIUM = ["#fbbf24", "#cbd5e1", "#e0883e"];
+
+/** Row styling: a coloured frame for the podium, a violet tint for you. */
 function rowClass(rank: number | null, mine: boolean) {
-  return `lk-row transition-colors hover:bg-zinc-900/70 ${mine ? "bg-violet-500/10" : rank === 1 ? "bg-amber-400/5" : ""}`;
+  const podium = rank != null && rank >= 1 && rank <= 3 ? `lk-podium lk-podium-${rank}` : "";
+  return `lk-row transition-colors hover:bg-zinc-900/70 ${podium} ${mine ? "bg-violet-500/10" : ""}`;
+}
+
+/** The CSS variable the podium frame is drawn with. */
+function rowStyle(i: number, rank: number | null) {
+  const style: Record<string, string | number> = { "--i": Math.min(i, 14) };
+  if (rank != null && rank >= 1 && rank <= 3) style["--m"] = PODIUM[rank - 1];
+  return style;
 }
 
 function Tabs({ tab, onChange }: { tab: "today" | "all"; onChange: (t: "today" | "all") => void }) {
@@ -189,7 +200,7 @@ export function LeaderboardView() {
               </thead>
               <tbody className="divide-y divide-zinc-800">
                 {today.rows.map((r, i) => (
-                  <tr key={`${r.rank}-${r.display_name}-${i}`} className={rowClass(r.rank, r.display_name === displayName)} style={{ ["--i" as string]: Math.min(i, 14) }}>
+                  <tr key={`${r.rank}-${r.display_name}-${i}`} className={rowClass(r.rank, r.display_name === displayName)} style={rowStyle(i, r.rank)}>
                     <td className={`${td} tabular-nums text-zinc-500`}>
                       <Rank rank={r.rank} />
                     </td>
@@ -228,7 +239,7 @@ export function LeaderboardView() {
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {allTime.rows.map((r, i) => (
-                <tr key={`${r.rank}-${r.display_name}-${i}`} className={rowClass(r.rank, r.display_name === displayName)} style={{ ["--i" as string]: Math.min(i, 14) }}>
+                <tr key={`${r.rank}-${r.display_name}-${i}`} className={rowClass(r.rank, r.display_name === displayName)} style={rowStyle(i, r.rank)}>
                   <td className={`${td} tabular-nums text-zinc-500`}>
                     <Rank rank={r.rank} />
                   </td>

@@ -5,6 +5,7 @@ import { badgeOneIn, formatOdds } from "@/lib/game/odds";
 import { tierColor, tierRank } from "@/lib/game/tiers";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { createClient } from "@/lib/supabase/client";
+import { BadgeAura } from "./BadgeAura";
 import { Chip } from "./Chip";
 import { formatNumber } from "./types";
 
@@ -126,29 +127,32 @@ export function BadgesView() {
           const odds = badgeOneIn(b.slug);
           const color = tierColor(b.rarity);
           return (
-            <li
-              key={b.slug}
-              className={`lk-card lk-lift flex gap-3 rounded-xl border bg-zinc-900/60 p-4 ${owned ? "" : "opacity-45 grayscale"}`}
-              style={{ ["--i" as string]: Math.min(idx, 18), borderColor: owned ? `${color}88` : "rgb(39 39 42)", boxShadow: owned && tierRank(b.rarity) >= 4 ? `0 0 22px -8px ${color}` : undefined }}
-            >
-              <span className="text-4xl" aria-hidden>
-                {b.emoji}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="font-semibold text-zinc-100">{b.name}</p>
-                  {owned && <span className="text-sm font-bold tabular-nums text-zinc-300">×{times}</span>}
+            <li key={b.slug} className="lk-card lk-lift" style={{ ["--i" as string]: Math.min(idx, 18) }}>
+              <BadgeAura slug={b.slug} rarity={b.rarity} active={owned} intensity={0.55}>
+                <div
+                  className={`flex h-full gap-3 rounded-xl border bg-zinc-900/90 p-4 ${owned ? "" : "opacity-45 grayscale"}`}
+                  style={{ borderColor: owned ? `${color}88` : "rgb(39 39 42)" }}
+                >
+                  <span className="text-4xl" aria-hidden>
+                    {b.emoji}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-semibold text-zinc-100">{b.name}</p>
+                      {owned && <span className="text-sm font-bold tabular-nums text-zinc-300">×{times}</span>}
+                    </div>
+                    <p className="text-xs text-zinc-400">{b.description}</p>
+                    {(familySize.get(b.family) ?? 0) > 1 && (
+                      <p className="mt-1 text-[11px] text-zinc-500">Family: {b.family}</p>
+                    )}
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Chip value={b.rarity} />
+                      <span className="text-xs tabular-nums text-violet-300">{formatNumber(b.ep)} EP</span>
+                      {odds && <span className="text-xs text-zinc-500">{formatOdds(odds)}</span>}
+                    </div>
+                  </div>
                 </div>
-                <p className="text-xs text-zinc-400">{b.description}</p>
-                {(familySize.get(b.family) ?? 0) > 1 && (
-                  <p className="mt-1 text-[11px] text-zinc-500">Family: {b.family}</p>
-                )}
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <Chip value={b.rarity} />
-                  <span className="text-xs tabular-nums text-violet-300">{formatNumber(b.ep)} EP</span>
-                  {odds && <span className="text-xs text-zinc-500">{formatOdds(odds)}</span>}
-                </div>
-              </div>
+              </BadgeAura>
             </li>
           );
         })}

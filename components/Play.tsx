@@ -15,7 +15,7 @@ import type { RollBadge, RollResultData, WheelPrize, WheelSpin } from "./types";
 /** Fallback if reroll_terms() can't be fetched; the database enforces the real values. */
 const DEFAULT_TERMS = { price: 400, max_per_day: 3 };
 /** Minimum spin before the digits start locking, for suspense. */
-const SPIN_MS = 900;
+const SPIN_MS = 1500;
 
 interface DayState {
   userId: string;
