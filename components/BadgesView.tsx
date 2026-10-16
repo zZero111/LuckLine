@@ -50,7 +50,7 @@ export function BadgesView() {
     };
   }, [status, userId]);
 
-  if (!data) return <div className="h-64 animate-pulse rounded-xl bg-zinc-900" />;
+  if (!data) return <div className="h-64 lk-shimmer rounded-xl bg-zinc-900" />;
   if (data.failed) return <p className="text-rose-300">Could not load the badges.</p>;
 
   const { badges, counts } = data;
@@ -119,8 +119,8 @@ export function BadgesView() {
           Showing {visible.length} of {badges.length}
         </p>
       </div>
-      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {visible.map((b) => {
+      <ul key={`${rarity}|${show}`} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {visible.map((b, idx) => {
           const times = counts?.get(b.slug) ?? 0;
           const owned = times > 0;
           const odds = badgeOneIn(b.slug);
@@ -128,8 +128,8 @@ export function BadgesView() {
           return (
             <li
               key={b.slug}
-              className={`flex gap-3 rounded-xl border bg-zinc-900/60 p-4 transition ${owned ? "" : "opacity-45 grayscale"}`}
-              style={{ borderColor: owned ? `${color}88` : "rgb(39 39 42)", boxShadow: owned && tierRank(b.rarity) >= 4 ? `0 0 22px -8px ${color}` : undefined }}
+              className={`lk-card lk-lift flex gap-3 rounded-xl border bg-zinc-900/60 p-4 ${owned ? "" : "opacity-45 grayscale"}`}
+              style={{ ["--i" as string]: Math.min(idx, 18), borderColor: owned ? `${color}88` : "rgb(39 39 42)", boxShadow: owned && tierRank(b.rarity) >= 4 ? `0 0 22px -8px ${color}` : undefined }}
             >
               <span className="text-4xl" aria-hidden>
                 {b.emoji}

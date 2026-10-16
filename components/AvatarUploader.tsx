@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import { AVATAR_BUCKET, resizeForAvatar } from "@/lib/avatars";
+import { sfx } from "@/lib/game/sfx";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "./Avatar";
@@ -38,8 +39,10 @@ export function AvatarUploader() {
       if (avatarPath) await supabase.storage.from(AVATAR_BUCKET).remove([avatarPath]);
       await refreshProfile();
       setMessage({ text: "Picture updated." });
+      sfx.success();
     } catch (err) {
       setMessage({ text: err instanceof Error ? err.message : "Something went wrong.", error: true });
+      sfx.error();
     } finally {
       setBusy(false);
     }

@@ -7,7 +7,6 @@ import { tierColor, tierHype, tierRank } from "@/lib/game/tiers";
 import { Chip } from "./Chip";
 import { Confetti } from "./Confetti";
 import { ShareButton } from "./ShareButton";
-import { SoundToggle } from "./SoundToggle";
 import { formatNumber, rollLabel, wheelTag, type RollResultData } from "./types";
 
 const SLOTS = 7;
@@ -335,7 +334,6 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
                 ↻ Replay reveal
               </button>
             )}
-            <SoundToggle />
           </div>
         </div>
       ) : (

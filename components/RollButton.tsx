@@ -1,6 +1,5 @@
 "use client";
 
-import { SoundToggle } from "./SoundToggle";
 
 /** Turns a roll_today / reroll_today error into a friendly message. */
 export function friendlyError(message: string): { text: string; href?: string; label?: string; refresh?: boolean } {
@@ -24,6 +23,7 @@ export function RollButton({ onRoll, streakBefore = 0 }: { onRoll: () => void; s
       <button
         type="button"
         onClick={onRoll}
+        data-sfx="rattle"
         className="lk-pulse rounded-2xl bg-violet-600 px-16 py-7 text-4xl font-black tracking-wide text-white transition hover:scale-105 hover:bg-violet-500 active:scale-95"
       >
         ROLL
@@ -31,7 +31,6 @@ export function RollButton({ onRoll, streakBefore = 0 }: { onRoll: () => void; s
       <p className="text-sm text-zinc-500">
         {streakBefore > 0 ? `🔥 ${streakBefore}-day streak. Keep it going.` : "One shot. Make it count."}
       </p>
-      <SoundToggle />
     </div>
   );
 }

@@ -59,7 +59,7 @@ function newSlugsFor(day: DayState, roll: RollResultData) {
   return new Set(roll.badges.map((b) => b.slug).filter((slug) => !seen.has(slug)));
 }
 
-const skeleton = <div className="h-40 w-full max-w-md animate-pulse rounded-xl bg-zinc-900" />;
+const skeleton = <div className="h-40 w-full max-w-md lk-shimmer rounded-xl bg-zinc-900" />;
 
 /** The home page play area: sign-in prompt, roll button, reveal and rerolls. */
 export function Play() {

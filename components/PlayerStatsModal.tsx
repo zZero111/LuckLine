@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { sfx } from "@/lib/game/sfx";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "./Avatar";
 import { Chip } from "./Chip";
+import { CountUp } from "./CountUp";
 import { formatNumber, wheelTag } from "./types";
 
 interface Stats {
@@ -23,9 +25,9 @@ interface Stats {
   wheel_spins: number;
 }
 
-function Tile({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) {
+function Tile({ label, value, sub, i = 0 }: { label: string; value: React.ReactNode; sub?: React.ReactNode; i?: number }) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3">
+    <div className="lk-card lk-lift rounded-xl border border-zinc-800 bg-zinc-900/70 p-3" style={{ ["--i" as string]: i }}>
       <p className="text-[11px] uppercase tracking-wide text-zinc-500">{label}</p>
       <p className="mt-0.5 text-xl font-bold tabular-nums">{value}</p>
       {sub && <p className="text-xs text-zinc-500">{sub}</p>}
@@ -54,12 +56,14 @@ export function PlayerStatsModal({ name, onClose }: { name: string; onClose: () 
   }, [name]);
 
   useEffect(() => {
+    sfx.open();
     closeBtn.current?.focus();
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
+      sfx.close();
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = overflow;
     };
@@ -69,7 +73,7 @@ export function PlayerStatsModal({ name, onClose }: { name: string; onClose: () 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="lk-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       onClick={onClose}
       role="presentation"
     >
@@ -105,7 +109,7 @@ export function PlayerStatsModal({ name, onClose }: { name: string; onClose: () 
         {failed ? (
           <p className="mt-6 text-rose-300">Couldn&apos;t load this player&apos;s stats.</p>
         ) : !stats ? (
-          <div className="mt-6 h-48 animate-pulse rounded-xl bg-zinc-900" />
+          <div className="mt-6 h-48 lk-shimmer rounded-xl bg-zinc-900" />
         ) : (
           <div className="mt-5 flex flex-col gap-3">
             {stats.best && (
@@ -127,12 +131,12 @@ export function PlayerStatsModal({ name, onClose }: { name: string; onClose: () 
             )}
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <Tile label="Total score" value={formatNumber(stats.total_ep)} sub="EP, best roll per day" />
-              <Tile label="Current streak" value={`🔥 ${stats.current_streak}`} sub={stats.current_streak === 1 ? "day" : "days"} />
-              <Tile label="Longest streak" value={stats.longest_streak} sub="days" />
-              <Tile label="Days played" value={formatNumber(stats.days_played)} />
-              <Tile label="Total rolls" value={formatNumber(stats.total_rolls)} sub="incl. rerolls" />
-              <Tile label="Wheel spins" value={formatNumber(stats.wheel_spins)} />
+              <Tile i={0} label="Total score" value={<CountUp value={stats.total_ep} />} sub="EP, best roll per day" />
+              <Tile i={1} label="Current streak" value={<>🔥 <CountUp value={stats.current_streak} /></>} sub={stats.current_streak === 1 ? "day" : "days"} />
+              <Tile i={2} label="Longest streak" value={<CountUp value={stats.longest_streak} />} sub="days" />
+              <Tile i={3} label="Days played" value={<CountUp value={stats.days_played} />} />
+              <Tile i={4} label="Total rolls" value={<CountUp value={stats.total_rolls} />} sub="incl. rerolls" />
+              <Tile i={5} label="Wheel spins" value={<CountUp value={stats.wheel_spins} />} />
             </div>
 
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { sfx } from "@/lib/game/sfx";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { createClient } from "@/lib/supabase/client";
 
@@ -35,8 +36,13 @@ export function ReminderToggle() {
     setError(false);
     const { error: e } = await createClient().from("reminder_prefs").update({ enabled: next }).eq("user_id", uid);
     setSaving(false);
-    if (e) setError(true);
-    else setEnabled(next);
+    if (e) {
+      setError(true);
+      sfx.error();
+    } else {
+      setEnabled(next);
+      sfx.toggle(next);
+    }
   }
 
   return (
@@ -55,6 +61,7 @@ export function ReminderToggle() {
         aria-label="Daily reminder email"
         disabled={enabled === null || saving}
         onClick={toggle}
+        data-sfx="none"
         className={`relative h-7 w-12 shrink-0 rounded-full transition disabled:opacity-50 ${enabled ? "bg-violet-600" : "bg-zinc-700"}`}
       >
         <span

@@ -6,17 +6,21 @@ import { useAuth } from "@/lib/supabase/auth-context";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "./Avatar";
 import { Chip } from "./Chip";
+import { CountUp } from "./CountUp";
 import { formatNumber, wheelTag } from "./types";
 
 const th = "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500";
 const td = "px-3 py-2";
-const skeleton = <div className="h-64 animate-pulse rounded-xl bg-zinc-900" />;
+const skeleton = <div className="h-64 lk-shimmer rounded-xl bg-zinc-900" />;
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, prefix = "", i = 0 }: { label: string; value: number; prefix?: string; i?: number }) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+    <div className="lk-card lk-lift rounded-xl border border-zinc-800 bg-zinc-900/60 p-4" style={{ ["--i" as string]: i }}>
       <p className="text-xs uppercase tracking-wide text-zinc-500">{label}</p>
-      <p className="mt-1 text-2xl font-bold tabular-nums">{value}</p>
+      <p className="mt-1 text-2xl font-bold tabular-nums">
+        {prefix}
+        <CountUp value={value} />
+      </p>
     </div>
   );
 }
@@ -85,10 +89,10 @@ export function ProfileView() {
         <h1 className="text-3xl font-bold tracking-tight">{displayName ?? "Your profile"}</h1>
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Score (best per day)" value={formatNumber(totals?.total_ep ?? 0)} />
-        <Stat label="Best roll" value={formatNumber(totals?.best_ep ?? 0)} />
-        <Stat label="Days played" value={formatNumber(totals?.roll_count ?? 0)} />
-        <Stat label="EP to spend" value={`💰 ${formatNumber(balance)}`} />
+        <Stat i={0} label="Score (best per day)" value={totals?.total_ep ?? 0} />
+        <Stat i={1} label="Best roll" value={totals?.best_ep ?? 0} />
+        <Stat i={2} label="Days played" value={totals?.roll_count ?? 0} />
+        <Stat i={3} label="EP to spend" value={balance} prefix="💰 " />
       </div>
       <h2 className="text-xl font-semibold">History</h2>
       {failed ? (
@@ -108,8 +112,8 @@ export function ProfileView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
-              {rolls.map((r) => (
-                <tr key={r.id}>
+              {rolls.map((r, i) => (
+                <tr key={r.id} className="lk-row transition-colors hover:bg-zinc-900/70" style={{ ["--i" as string]: Math.min(i, 14) }}>
                   <td className={`${td} tabular-nums text-zinc-400`}>
                     {r.roll_date}
                     {r.attempt > 0 && <span className="ml-2 text-xs text-amber-300/80">reroll {r.attempt}</span>}

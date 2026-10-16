@@ -17,11 +17,30 @@ type Loaded<T> = { rows: T[]; failed: boolean };
 
 const th = "px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500";
 const td = "px-3 py-2";
-const skeleton = <div className="h-64 animate-pulse rounded-xl bg-zinc-900" />;
+const skeleton = <div className="h-64 lk-shimmer rounded-xl bg-zinc-900" />;
+
+const MEDALS = ["🥇", "🥈", "🥉"];
+
+/** The rank cell: medals for the top three. */
+function Rank({ rank }: { rank: number | null }) {
+  if (rank != null && rank >= 1 && rank <= 3) {
+    return (
+      <span className="lk-medal text-lg" title={`#${rank}`} style={{ animationDelay: `${rank * 0.4}s` }}>
+        {MEDALS[rank - 1]}
+      </span>
+    );
+  }
+  return <>{rank}</>;
+}
+
+/** Row tint: gold for first place, violet for you. */
+function rowClass(rank: number | null, mine: boolean) {
+  return `lk-row transition-colors hover:bg-zinc-900/70 ${mine ? "bg-violet-500/10" : rank === 1 ? "bg-amber-400/5" : ""}`;
+}
 
 function Tabs({ tab, onChange }: { tab: "today" | "all"; onChange: (t: "today" | "all") => void }) {
   const cls = (active: boolean) =>
-    `rounded-lg px-4 py-2 text-sm font-medium ${active ? "bg-violet-600 text-white" : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"}`;
+    `rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-200 ${active ? "bg-violet-600 text-white shadow-lg shadow-violet-900/40" : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"}`;
   return (
     <nav className="flex gap-2">
       <button type="button" onClick={() => onChange("today")} className={cls(tab === "today")}>
@@ -86,7 +105,7 @@ function PlayerCell({
 }
 
 export function LeaderboardView() {
-  const { status, user } = useAuth();
+  const { status, user, displayName } = useAuth();
   const [tab, setTab] = useState<"today" | "all">("today");
   const [today, setToday] = useState<Loaded<TodayRow> | undefined>(undefined);
   const [allTime, setAllTime] = useState<Loaded<AllTimeRow> | undefined>(undefined);
@@ -157,7 +176,7 @@ export function LeaderboardView() {
         !today?.rows.length ? (
           <p className="text-zinc-400">Nobody has rolled yet today. Be the first!</p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-zinc-800">
+          <div key="today" className="lk-tab-in overflow-x-auto rounded-xl border border-zinc-800">
             <table className="w-full text-sm">
               <thead className="bg-zinc-900">
                 <tr>
@@ -170,8 +189,10 @@ export function LeaderboardView() {
               </thead>
               <tbody className="divide-y divide-zinc-800">
                 {today.rows.map((r, i) => (
-                  <tr key={`${r.rank}-${r.display_name}-${i}`}>
-                    <td className={`${td} tabular-nums text-zinc-500`}>{r.rank}</td>
+                  <tr key={`${r.rank}-${r.display_name}-${i}`} className={rowClass(r.rank, r.display_name === displayName)} style={{ ["--i" as string]: Math.min(i, 14) }}>
+                    <td className={`${td} tabular-nums text-zinc-500`}>
+                      <Rank rank={r.rank} />
+                    </td>
                     <td className={`${td} font-medium`}>
                       <PlayerCell name={r.display_name} avatarPath={r.avatar_path} isAdmin={isAdmin} onRemoved={() => setReload((n) => n + 1)} onOpen={setOpenName} />
                     </td>
@@ -194,7 +215,7 @@ export function LeaderboardView() {
       ) : !allTime?.rows.length ? (
         <p className="text-zinc-400">No rolls yet.</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-zinc-800">
+        <div key="all" className="lk-tab-in overflow-x-auto rounded-xl border border-zinc-800">
           <table className="w-full text-sm">
             <thead className="bg-zinc-900">
               <tr>
@@ -207,8 +228,10 @@ export function LeaderboardView() {
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {allTime.rows.map((r, i) => (
-                <tr key={`${r.rank}-${r.display_name}-${i}`}>
-                  <td className={`${td} tabular-nums text-zinc-500`}>{r.rank}</td>
+                <tr key={`${r.rank}-${r.display_name}-${i}`} className={rowClass(r.rank, r.display_name === displayName)} style={{ ["--i" as string]: Math.min(i, 14) }}>
+                  <td className={`${td} tabular-nums text-zinc-500`}>
+                    <Rank rank={r.rank} />
+                  </td>
                   <td className={`${td} font-medium`}>
                     <PlayerCell name={r.display_name} avatarPath={r.avatar_path} isAdmin={isAdmin} onRemoved={() => setReload((n) => n + 1)} onOpen={setOpenName} />
                   </td>
