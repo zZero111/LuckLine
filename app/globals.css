@@ -84,6 +84,13 @@ body {
 }
 .lk-pulse { animation: lk-pulse 1.8s ease-in-out infinite; }
 
+/* Home-page logo: a gentle idle wobble. */
+@keyframes lk-logo-wobble {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-8deg) translateY(-2px); }
+}
+.lk-logo-wobble { animation: lk-logo-wobble 3.2s ease-in-out infinite; }
+
 /* Digit thud and graded shakes. */
 @keyframes lk-thud {
   0% { transform: translateY(0) scale(1); }
@@ -139,7 +146,7 @@ body {
 .lk-heartbeat { animation: lk-heartbeat 0.7s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .lk-thud, .lk-shake-s, .lk-shake-m, .lk-shake-xl, .lk-heartbeat { animation: none; }
+  .lk-logo-wobble, .lk-thud, .lk-shake-s, .lk-shake-m, .lk-shake-xl, .lk-heartbeat { animation: none; }
   .lk-flash { display: none; }
   .lk-lock, .lk-tease, .lk-slam, .lk-pop, .lk-fade, .lk-shake, .lk-pulse { animation: none; }
   .lk-confetti { display: none; }
