@@ -161,6 +161,308 @@ button, [role="switch"] { transition-property: transform, background-color, bord
 }
 .lk-medal { display: inline-block; animation: lk-medal 3.5s ease-in-out infinite; }
 
+/* The top three rows get a frame in their medal colour. Drawn with inset
+   shadows on the cells, which works inside a collapsed table border. */
+.lk-podium > td {
+  --f: 2px;
+  box-shadow: inset 0 var(--f) 0 var(--m), inset 0 calc(var(--f) * -1) 0 var(--m);
+  background-color: color-mix(in srgb, var(--m) 8%, transparent);
+}
+.lk-podium > td:first-child {
+  box-shadow: inset var(--f) 0 0 var(--m), inset 0 var(--f) 0 var(--m), inset 0 calc(var(--f) * -1) 0 var(--m);
+}
+.lk-podium > td:last-child {
+  box-shadow: inset calc(var(--f) * -1) 0 0 var(--m), inset 0 var(--f) 0 var(--m), inset 0 calc(var(--f) * -1) 0 var(--m);
+}
+.lk-podium-1 > td { --f: 3px; }
+.lk-podium-1 > td:first-child .lk-medal { filter: drop-shadow(0 0 6px #fbbf24); }
+
+/* --- The full-screen roll -------------------------------------------------- */
+
+/* A digit landing: it slams down from above with a heavy overshoot. */
+@keyframes lk-slam-big {
+  0% { transform: translateY(-55%) scale(2.4); opacity: 0; filter: blur(10px); }
+  38% { transform: translateY(10%) scale(0.86); opacity: 1; filter: none; }
+  58% { transform: translateY(-3%) scale(1.07); }
+  78% { transform: translateY(1%) scale(0.98); }
+  100% { transform: none; }
+}
+.lk-slam-big { animation: lk-slam-big 0.55s cubic-bezier(0.2, 0.9, 0.25, 1); }
+
+/* The whole stage jolts on each landing. --amp (px) is set per digit. */
+@keyframes lk-quake {
+  0%, 100% { transform: none; }
+  12% { transform: translate(calc(var(--amp, 10) * -1px), calc(var(--amp, 10) * 0.55px)) rotate(-0.35deg); }
+  26% { transform: translate(calc(var(--amp, 10) * 1px), calc(var(--amp, 10) * -0.7px)) rotate(0.3deg); }
+  42% { transform: translate(calc(var(--amp, 10) * -0.6px), calc(var(--amp, 10) * 0.4px)); }
+  60% { transform: translate(calc(var(--amp, 10) * 0.35px), calc(var(--amp, 10) * -0.2px)); }
+  80% { transform: translate(calc(var(--amp, 10) * -0.15px), 0); }
+}
+.lk-quake { animation: lk-quake 0.6s cubic-bezier(0.2, 0.7, 0.3, 1); }
+
+/* A ring of force from the digit that just landed. */
+@keyframes lk-shockwave {
+  from { transform: translate(-50%, -50%) scale(0.15); opacity: 0.85; border-width: 10px; }
+  to { transform: translate(-50%, -50%) scale(3.4); opacity: 0; border-width: 1px; }
+}
+.lk-shockwave {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 55vmin;
+  height: 55vmin;
+  border-radius: 9999px;
+  border: 6px solid var(--tier, #8b5cf6);
+  box-shadow: 0 0 40px var(--tier, #8b5cf6), inset 0 0 40px var(--tier, #8b5cf6);
+  pointer-events: none;
+  animation: lk-shockwave 1s cubic-bezier(0.15, 0.7, 0.3, 1) forwards;
+}
+
+/* --- Badge auras ------------------------------------------------------------ */
+
+@property --lk-ang {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes lk-ang { to { --lk-ang: 360deg; } }
+
+.lk-aura { position: relative; isolation: isolate; }
+.lk-fx-layer { position: absolute; inset: 0; pointer-events: none; display: block; }
+.lk-fx { position: absolute; pointer-events: none; }
+
+/* The soft glow: bigger and brighter the rarer the badge. */
+@keyframes lk-ignite {
+  0% { opacity: 0; transform: scale(0.5); }
+  45% { opacity: 1; transform: scale(1.25); }
+  100% { opacity: var(--aura-alpha, 0.5); transform: scale(1); }
+}
+@keyframes lk-breathe {
+  0%, 100% { opacity: calc(var(--aura-alpha, 0.5) * 0.7); transform: scale(0.98); }
+  50% { opacity: var(--aura-alpha, 0.5); transform: scale(1.05); }
+}
+.lk-aura-glow {
+  position: absolute;
+  inset: calc(var(--aura-size, 10px) * -0.55);
+  border-radius: calc(var(--radius, 0.75rem) + var(--aura-size, 10px));
+  background: radial-gradient(closest-side, var(--aura), transparent);
+  filter: blur(calc(var(--aura-size, 10px) * 0.5)) hue-rotate(var(--hue, 0deg));
+  opacity: var(--aura-alpha, 0.5);
+  z-index: -1;
+  pointer-events: none;
+  animation: lk-ignite 0.8s ease-out backwards, lk-breathe 2.8s ease-in-out 0.8s infinite;
+}
+
+/* One shockwave when the badge lands. */
+@keyframes lk-burst {
+  0% { opacity: 0.95; inset: 0; }
+  100% { opacity: 0; inset: calc(var(--aura-size, 10px) * -0.9); }
+}
+.lk-aura-burst {
+  position: absolute;
+  inset: 0;
+  border-radius: calc(var(--radius, 0.75rem) + 4px);
+  border: 2px solid var(--aura);
+  box-shadow: 0 0 calc(var(--aura-size, 10px) * 0.6) var(--aura);
+  pointer-events: none;
+  animation: lk-burst 0.9s ease-out forwards;
+}
+
+/* Rings expanding outward (uncommon). */
+@keyframes lk-ring {
+  0% { opacity: 0.85; inset: 0; }
+  100% { opacity: 0; inset: calc(var(--aura-size, 10px) * -0.8); }
+}
+.lk-fx-ring {
+  inset: 0;
+  border-radius: calc(var(--radius, 0.75rem) + 4px);
+  border: 2px solid var(--aura);
+  opacity: 0;
+  animation: lk-ring 2.4s ease-out infinite;
+  animation-delay: calc(var(--i, 0) * 0.8s);
+}
+
+/* Twinkling four-point stars (rare and up). */
+@keyframes lk-twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.2) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(60deg); }
+}
+.lk-fx-spark {
+  width: var(--s, 8px);
+  height: var(--s, 8px);
+  margin: calc(var(--s, 8px) / -2) 0 0 calc(var(--s, 8px) / -2);
+  background: radial-gradient(circle, #fff 0 18%, var(--aura) 19% 48%, transparent 72%);
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+  filter: drop-shadow(0 0 3px var(--aura));
+  opacity: 0;
+  animation: lk-twinkle var(--t, 1.6s) ease-in-out infinite;
+  animation-delay: var(--d, 0s);
+}
+
+/* A comet circling the border (epic and up), and the rainbow version (mythic). */
+.lk-fx-orbit,
+.lk-fx-prism {
+  inset: -2px;
+  border-radius: calc(var(--radius, 0.75rem) + 2px);
+  padding: 2px;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+.lk-fx-orbit {
+  background: conic-gradient(from var(--lk-ang), transparent 0 50%, var(--aura) 82%, #fff 100%);
+  filter: drop-shadow(0 0 5px var(--aura));
+  animation: lk-ang var(--t, 2.8s) linear infinite;
+}
+.lk-fx-prism {
+  inset: -3px;
+  padding: 3px;
+  background: conic-gradient(from var(--lk-ang), #f43f5e, #f59e0b, #84cc16, #22d3ee, #8b5cf6, #ec4899, #f43f5e);
+  filter: saturate(1.4) drop-shadow(0 0 8px var(--aura));
+  animation: lk-ang 3s linear infinite;
+}
+
+/* A shine sweeping across the card (mythic, gold). */
+.lk-fx-sheen { inset: 0; border-radius: var(--radius, 0.75rem); overflow: hidden; }
+.lk-fx-sheen::after {
+  content: "";
+  position: absolute;
+  top: -10%;
+  bottom: -10%;
+  left: -60%;
+  width: 40%;
+  background: linear-gradient(105deg, transparent, rgb(255 255 255 / 0.32), transparent);
+  transform: skewX(-18deg);
+  animation: lk-sheen 3.2s ease-in-out infinite;
+}
+.lk-fx-sheen-gold::after {
+  background: linear-gradient(105deg, transparent, rgb(253 224 71 / 0.35), rgb(255 255 255 / 0.6), rgb(253 224 71 / 0.35), transparent);
+  animation-duration: 2.6s;
+}
+@keyframes lk-sheen {
+  0% { left: -60%; }
+  60%, 100% { left: 130%; }
+}
+
+/* Sparks lifting off the top edge (fire). */
+@keyframes lk-ember {
+  0% { opacity: 0; transform: translate(0, 0) scale(1); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx, 0px), calc(var(--rise, 50px) * -1)) scale(0.2); }
+}
+.lk-fx-ember {
+  top: 6px;
+  width: var(--s, 4px);
+  height: var(--s, 4px);
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff, var(--aura) 55%, transparent 78%);
+  box-shadow: 0 0 6px 2px var(--aura);
+  opacity: 0;
+  animation: lk-ember var(--t, 2s) ease-out infinite;
+  animation-delay: var(--d, 0s);
+}
+
+/* Crackling bolts (electric, anomaly and mythic). */
+@keyframes lk-bolt {
+  0%, 100% { opacity: 0; }
+  4% { opacity: 1; }
+  9% { opacity: 0; }
+  12% { opacity: 0.9; }
+  17% { opacity: 0; }
+}
+.lk-fx-bolt {
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  overflow: visible;
+  transform: rotate(var(--rot, 0deg));
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 3px var(--aura)) drop-shadow(0 0 8px var(--aura));
+  opacity: 0;
+  animation: lk-bolt var(--t, 2s) steps(1, end) infinite;
+  animation-delay: var(--d, 0s);
+}
+
+/* A dark vortex pulling inward (void). */
+.lk-fx-vortex {
+  z-index: -1;
+  inset: calc(var(--aura-size, 10px) * -0.7);
+  border-radius: 9999px;
+  background: conic-gradient(from var(--lk-ang), #000 0 18%, #6d28d9 34%, #000 50%, #a855f7 68%, #000 84%);
+  filter: blur(calc(var(--aura-size, 10px) * 0.22));
+  opacity: 0.9;
+  animation: lk-ang 5s linear infinite;
+}
+@keyframes lk-pull {
+  0% { opacity: 0; inset: calc(var(--aura-size, 10px) * -0.95); }
+  35% { opacity: 0.9; }
+  100% { opacity: 0; inset: 0; }
+}
+.lk-fx-pull {
+  border-radius: calc(var(--radius, 0.75rem) + 8px);
+  border: 1px solid #c084fc;
+  box-shadow: 0 0 8px #a855f7;
+  opacity: 0;
+  animation: lk-pull 3s ease-in infinite;
+  animation-delay: calc(var(--i, 0) * 1s);
+}
+.lk-theme-void .lk-aura-glow { background: radial-gradient(closest-side, #000 20%, var(--aura) 62%, transparent); }
+
+/* Gold glints falling away from the card. */
+@keyframes lk-coin {
+  0% { opacity: 0; transform: translateY(0) rotate(0deg) scale(0.6); }
+  15% { opacity: 1; transform: translateY(6px) rotate(40deg) scale(1); }
+  100% { opacity: 0; transform: translateY(var(--fall, 50px)) rotate(var(--spin, 360deg)) scale(0.7); }
+}
+.lk-fx-coin {
+  width: 7px;
+  height: 7px;
+  background: linear-gradient(135deg, #fff7ad, #facc15 50%, #b45309);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  filter: drop-shadow(0 0 3px #facc15);
+  opacity: 0;
+  animation: lk-coin var(--t, 2s) ease-in infinite;
+  animation-delay: var(--d, 0s);
+}
+
+/* Code raining down the sides (hex, binary, leet). */
+@keyframes lk-code {
+  0% { opacity: 0; transform: translateY(0); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(var(--fall, 50px)); }
+}
+.lk-fx-code {
+  font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--aura);
+  text-shadow: 0 0 6px var(--aura);
+  opacity: 0;
+  animation: lk-code var(--t, 2s) linear infinite;
+  animation-delay: var(--d, 0s);
+}
+
+/* Themed glow behaviour. */
+@keyframes lk-flicker {
+  0%, 100% { opacity: calc(var(--aura-alpha, 0.5) * 0.8); transform: scale(1); }
+  14% { opacity: var(--aura-alpha, 0.5); transform: scale(1.06, 1.1); }
+  30% { opacity: calc(var(--aura-alpha, 0.5) * 0.65); transform: scale(0.98); }
+  52% { opacity: var(--aura-alpha, 0.5); transform: scale(1.04, 1.12); }
+  76% { opacity: calc(var(--aura-alpha, 0.5) * 0.75); transform: scale(1.01); }
+}
+.lk-theme-fire .lk-aura-glow { animation: lk-ignite 0.8s ease-out backwards, lk-flicker 1.2s ease-in-out 0.8s infinite; }
+.lk-theme-electric .lk-aura-glow { animation: lk-ignite 0.8s ease-out backwards, lk-flicker 0.5s steps(3, end) 0.8s infinite; }
+@keyframes lk-hue {
+  0%, 100% { filter: blur(calc(var(--aura-size, 10px) * 0.5)) hue-rotate(-40deg); }
+  50% { filter: blur(calc(var(--aura-size, 10px) * 0.5)) hue-rotate(40deg); }
+}
+.lk-theme-cosmic .lk-aura-glow { animation: lk-ignite 0.8s ease-out backwards, lk-breathe 3.2s ease-in-out 0.8s infinite, lk-hue 6s ease-in-out infinite; }
+
+html, body { overflow-x: clip; }
+
 /* Dialog backdrop. */
 @keyframes lk-backdrop { from { opacity: 0; } to { opacity: 1; } }
 .lk-backdrop { animation: lk-backdrop 0.25s ease-out; }
@@ -229,6 +531,9 @@ button, [role="switch"] { transition-property: transform, background-color, bord
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
+  .lk-fx, .lk-aura-burst, .lk-shockwave { display: none; }
+  .lk-aura-glow { animation: none !important; }
+  .lk-slam-big, .lk-quake { animation: none; }
   .lk-page, .lk-tab-in, .lk-row, .lk-card, .lk-shimmer, .lk-new, .lk-medal, .lk-backdrop { animation: none; }
   .lk-lift:hover { transform: none; }
   .lk-logo-wobble, .lk-thud, .lk-shake-s, .lk-shake-m, .lk-shake-xl, .lk-heartbeat { animation: none; }

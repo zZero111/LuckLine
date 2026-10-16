@@ -57,6 +57,24 @@ function tone(freq: number, delay: number, dur: number, type: OscillatorType = "
   osc.stop(t + dur + 0.05);
 }
 
+/** A tone whose pitch glides from one frequency to another: kicks, zaps, drops. */
+function sweep(from: number, to: number, dur: number, type: OscillatorType = "sine", gain = 0.1, delay = 0) {
+  const c = audio();
+  if (!c) return;
+  const t = c.currentTime + delay;
+  const osc = c.createOscillator();
+  const amp = c.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(from, t);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(1, to), t + dur);
+  amp.gain.setValueAtTime(0.0001, t);
+  amp.gain.exponentialRampToValueAtTime(gain, t + 0.008);
+  amp.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.connect(amp).connect(c.destination);
+  osc.start(t);
+  osc.stop(t + dur + 0.05);
+}
+
 let noiseBuffer: AudioBuffer | null = null;
 
 /** A short burst of filtered noise: clacks, shakes and whooshes. */
@@ -152,6 +170,14 @@ export const sfx = {
   suspense() {
     tone(110, 0, 0.9, "sawtooth", 0.025);
     tone(116.5, 0, 0.9, "sawtooth", 0.02);
+  },
+  /** A heavy digit landing: sub-bass drop, a crack and a low rumble. power ~1 (soft) to 2 (huge). */
+  thud(power = 1) {
+    const p = Math.min(2.2, Math.max(0.5, power));
+    sweep(150, 38, 0.5, "sine", 0.28 * p);
+    sweep(90, 30, 0.7, "sine", 0.16 * p, 0.02);
+    noise(0, 0.1, 2600, 0.05 * p, 0.9); // the crack
+    noise(0.01, 0.35, 140, 0.12 * p, 0.7, 60); // the rumble
   },
   /** A low double thump, for the tension before a very rare roll lands. */
   heartbeat() {

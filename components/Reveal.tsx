@@ -5,12 +5,31 @@ import { badgeOneIn, formatOdds, percentileLine } from "@/lib/game/odds";
 import { sfx, vibrate } from "@/lib/game/sfx";
 import { tierColor, tierHype, tierRank } from "@/lib/game/tiers";
 import { Chip } from "./Chip";
+import { BadgeAura } from "./BadgeAura";
 import { Confetti } from "./Confetti";
 import { ShareButton } from "./ShareButton";
 import { formatNumber, rollLabel, wheelTag, type RollResultData } from "./types";
 
-const SLOTS = 7;
-const SHAKE_CLASS = ["", "lk-shake-s", "lk-shake-m", "lk-shake", "lk-shake-xl"]; // 0 … 1,000,000 fits in seven digits: d,ddd,ddd
+const SLOTS = 7; // 0 … 1,000,000 fits in seven digits: d,ddd,ddd
+const SHAKE_CLASS = ["", "lk-shake-s", "lk-shake-m", "lk-shake", "lk-shake-xl"];
+
+/** The cinematic full-screen roll, then a crossfade back to the page. */
+type Phase = "stage" | "closing" | "page";
+
+/** Restart a one-shot CSS animation class on an element. */
+function retrigger(el: HTMLElement | null, cls: string, amp?: number) {
+  if (!el) return;
+  if (amp != null) el.style.setProperty("--amp", String(amp));
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+
+/** Two hex digits for a 0..1 opacity. */
+const hexAlpha = (a: number) =>
+  Math.round(Math.min(1, Math.max(0, a)) * 255)
+    .toString(16)
+    .padStart(2, "0");
 
 function randomReel(): string[] {
   return Array.from({ length: SLOTS }, () => String(Math.floor(Math.random() * 10)));
@@ -43,7 +62,7 @@ interface Stage {
   done: boolean;
 }
 
-/** The roll reveal: spinning reel, digit locks, tier slam, EP count-up, badges. */
+/** The roll reveal: a full-screen reel that lands digit by digit, then the result page. */
 export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: Props) {
   const instant = !animate || prefersReducedMotion();
   const finalStage = useCallback(
@@ -60,27 +79,19 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
   const [stage, setStage] = useState<Stage>(() =>
     instant && result ? finalStage(result) : { locked: 0, suspense: false, tier: false, ep: 0, badges: 0, done: false },
   );
+  const [phase, setPhase] = useState<Phase>(instant ? "page" : "stage");
   // Reduced motion (or a result shown later) skips straight to the end.
   const view: Stage = instant && result ? finalStage(result) : stage;
+  const showStage = !instant && phase !== "page";
   const [reel, setReel] = useState<string[]>(() => randomReel());
   const [burst, setBurst] = useState(0); // confetti trigger
-  // 0 none, 1 small … 4 earthquake. Set when the tier lands.
-  const [shake, setShake] = useState(0);
-  const [dim, setDim] = useState(false); // spotlight on the number while it teases
+  const [shake, setShake] = useState(0); // 0 none … 4 earthquake, when the tier lands
+  const [dim, setDim] = useState(false); // the stage goes black while a rare roll teases
   const [flash, setFlash] = useState(0); // full-screen flash trigger
+  const [shock, setShock] = useState(0); // shockwave ring trigger (one per landed digit)
   const timers = useRef<number[]>([]);
-  const reelRef = useRef<HTMLParagraphElement>(null);
+  const quakeRef = useRef<HTMLDivElement>(null);
 
-  /** Restart a one-shot CSS animation on the reel (a thud per locked digit). */
-  const thud = () => {
-    const el = reelRef.current;
-    if (!el) return;
-    el.classList.remove("lk-thud");
-    void el.offsetWidth;
-    el.classList.add("lk-thud");
-  };
-
-  // Badges in ascending EP so the best one lands last.
   const badges = result ? [...result.badges].sort((a, b) => a.ep - b.ep) : [];
   const digits = result ? String(result.number).padStart(SLOTS, "0").split("") : [];
   const firstSignificant = result ? Math.min(SLOTS - 1, SLOTS - String(result.number).length) : SLOTS;
@@ -98,16 +109,27 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
     return () => window.clearInterval(id);
   }, [view.locked, animate]);
 
-  // Schedule the reveal once the result is known.
+  // Keep the page still behind the full-screen roll.
+  useEffect(() => {
+    if (!showStage) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [showStage]);
+
+  // Schedule the whole reveal once the result is known.
   useEffect(() => {
     if (!result || instant) return;
     const at = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms));
     const r = tierRank(result.tier);
-    // Suspense on the last digit grows with rarity (rare .. mythic).
-    const TEASE = [0, 0, 0, 1100, 1700, 2500, 3300];
-    let t = 450;
+    // The last digit teases longer the rarer the roll (rare .. mythic).
+    const TEASE = [0, 0, 0, 1500, 2200, 3000, 4000];
+    let t = 500;
     for (let i = 0; i < SLOTS; i++) {
       const last = i === SLOTS - 1;
+      const significant = i >= firstSignificant;
       if (last && r >= 3) {
         at(t, () => {
           setStage((s) => ({ ...s, suspense: true }));
@@ -118,15 +140,21 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
         if (r >= 5) for (let h = 500; h < TEASE[r] - 200; h += 700) at(t + h, () => sfx.heartbeat());
         t += TEASE[r];
       }
-      // Leading zeros lock quickly; real digits get a heavy beat each.
-      t += i < firstSignificant ? 110 : 300;
+      // Leading zeros drop quickly; every real digit gets a slow, heavy beat.
+      t += significant ? 650 + (r >= 4 ? 120 : 0) + (i - firstSignificant) * 30 : 170;
+      const power = 0.85 + (significant ? (i - firstSignificant) * 0.14 : 0) + r * 0.09;
       at(t, () => {
         setStage((s) => ({ ...s, locked: i + 1, suspense: false }));
         sfx.lock(i);
-        if (i >= firstSignificant) thud();
+        if (significant) {
+          sfx.thud(power);
+          retrigger(quakeRef.current, "lk-quake", 7 + power * 9);
+          setShock((k) => k + 1);
+          vibrate(Math.round(30 + power * 25));
+        }
       });
     }
-    t += r >= 5 ? 650 : 450;
+    t += r >= 5 ? 1100 : 800;
     at(t, () => {
       setDim(false);
       setStage((s) => ({ ...s, tier: true }));
@@ -148,10 +176,13 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
       const v = Math.round((result.ep * k) / steps);
       at(t + 200 + k * tickMs, () => setStage((s) => ({ ...s, ep: v })));
     }
-    t += 200 + steps * tickMs + 300;
+    t += 200 + steps * tickMs + (r >= 5 ? 1700 : 1200); // hold on the result
+    at(t, () => setPhase("closing")); // the stage fades out ...
+    at(t + 700, () => setPhase("page")); // ... and is removed
+    t += 500;
     const sorted = [...result.badges].sort((a, b) => a.ep - b.ep);
     // Keep long badge lists snappy: about 3.4 s at most for all of them.
-    const step = Math.min(340, Math.floor(3400 / Math.max(1, sorted.length)));
+    const step = Math.min(420, Math.floor(3800 / Math.max(1, sorted.length)));
     sorted.forEach((b, k) => {
       at(t + k * step, () => {
         setStage((s) => ({ ...s, badges: k + 1 }));
@@ -176,170 +207,225 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
     timers.current.forEach((id) => window.clearTimeout(id));
     timers.current = [];
     setStage(finalStage(result));
+    setPhase("page");
     setShake(0);
     setDim(false);
   }
 
+  // Esc skips the roll too.
+  useEffect(() => {
+    if (!showStage) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && skip();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showStage, result]);
+
   const tierShown = view.tier && result;
+
+  /** The seven reel slots with commas. `big` gives locked digits the heavy slam. */
+  const reelSlots = (big: boolean) =>
+    Array.from({ length: SLOTS }, (_, i) => {
+      const isLocked = i < view.locked && result;
+      const lead = result && i < firstSignificant;
+      const teasing = view.suspense && i === SLOTS - 1;
+      return (
+        <span key={i} className="flex items-end">
+          <span
+            key={isLocked ? "locked" : "spin"}
+            className={
+              isLocked
+                ? `${big && !lead ? "lk-slam-big" : "lk-lock"} inline-block ${lead ? "text-zinc-700" : "text-zinc-50"}`
+                : `inline-block ${teasing ? "lk-tease text-amber-300" : "text-violet-300/80 blur-[1px]"}`
+            }
+          >
+            {isLocked ? digits[i] : reel[i]}
+          </span>
+          {(i === 0 || i === 3) && <span className={result && firstSignificant > i ? "text-zinc-700" : "text-zinc-500"}>,</span>}
+        </span>
+      );
+    });
+
+  const glow = Math.min(1, view.locked / SLOTS);
 
   return (
     <>
-      {/* Screen overlays live outside the shaking box: a transformed parent would trap them. */}
+      {/* Screen overlays live outside any shaking box: a transformed parent would trap them. */}
       {burst > 0 && <Confetti key={burst} color={color} rank={rank} />}
-      {/* Spotlight: dim everything but the number while a very rare roll teases. */}
-      <div
-        aria-hidden
-        className={`pointer-events-none fixed inset-0 z-40 bg-black transition-opacity duration-700 ${dim ? "opacity-80" : "opacity-0"}`}
-      />
       {flash > 0 && (
         <div
           key={flash}
           aria-hidden
           className="lk-flash pointer-events-none fixed inset-0 z-50"
-          style={{ background: `radial-gradient(circle at 50% 30%, #ffffff, ${color} 45%, transparent 75%)` }}
+          style={{ background: `radial-gradient(circle at 50% 40%, #ffffff, ${color} 45%, transparent 75%)` }}
         />
       )}
 
-    <div
-      className={`relative flex w-full flex-col items-center gap-6 ${SHAKE_CLASS[shake]}`}
-      onClick={skip}
-      style={{ ["--tier" as string]: color }}
-    >
-      {/* Glow behind the number once the tier lands. */}
-      <div
-        aria-hidden
-        className={`pointer-events-none absolute -top-10 left-1/2 h-64 w-[36rem] max-w-full -translate-x-1/2 rounded-full blur-3xl transition-opacity duration-700 ${
-          tierShown && rank >= 2 ? "opacity-100" : "opacity-0"
-        }`}
-        style={{ background: `radial-gradient(closest-side, ${color}55, transparent)` }}
-      />
-
-      <div className={`relative text-center ${dim ? "z-50" : ""}`}>
-        <p className="text-sm uppercase tracking-widest text-zinc-500">
-          {result ? `${result.attempt ? rollLabel(result.attempt) : "Your roll"} for ${result.roll_date}` : "Rolling…"}
-        </p>
-
-        {/* The reel */}
-        <p
-          ref={reelRef}
-          className={`mt-2 flex items-end justify-center font-mono text-6xl font-bold tabular-nums sm:text-7xl ${dim ? "lk-heartbeat" : ""}`}
-          aria-live="polite"
-          aria-label={view.done && result ? formatNumber(result.number) : undefined}
+      {/* The full-screen roll. */}
+      {showStage && (
+        <div
+          aria-hidden
+          role="presentation"
+          onClick={skip}
+          className={`fixed inset-0 z-[45] flex cursor-pointer items-center justify-center overflow-hidden transition-opacity duration-500 ${
+            phase === "closing" ? "pointer-events-none opacity-0" : "opacity-100"
+          }`}
+          style={{
+            background: dim
+              ? "#000"
+              : `radial-gradient(ellipse at 50% 45%, ${color}${hexAlpha(0.06 + glow * 0.32)} 0%, transparent 66%), #09090b`,
+            transition: "background 0.6s, opacity 0.5s",
+            ["--tier" as string]: color,
+          }}
         >
-          {Array.from({ length: SLOTS }, (_, i) => {
-            const isLocked = i < view.locked && result;
-            const lead = result && i < firstSignificant;
-            const teasing = view.suspense && i === SLOTS - 1;
-            return (
-              <span key={i} className="flex items-end">
-                <span
-                  key={isLocked ? "locked" : "spin"}
-                  className={
-                    isLocked
-                      ? `lk-lock inline-block ${lead ? "text-zinc-700" : "text-zinc-50"}`
-                      : `inline-block ${teasing ? "lk-tease text-amber-300" : "text-violet-300/80 blur-[1px]"}`
-                  }
-                >
-                  {isLocked ? digits[i] : reel[i]}
-                </span>
-                {(i === 0 || i === 3) && (
-                  <span className={result && firstSignificant > i ? "text-zinc-700" : "text-zinc-500"}>,</span>
-                )}
-              </span>
-            );
-          })}
-        </p>
-
-        {/* Tier + EP */}
-        <div className={`mt-5 flex flex-col items-center gap-2 ${tierShown ? "" : "invisible"}`}>
-          {tierShown && (
-            <>
-              <div className="lk-slam flex items-center gap-3">
-                <Chip value={result.tier} size="lg" />
-                <span className="text-2xl font-extrabold tabular-nums" style={{ color }}>
-                  {formatNumber(view.ep)} EP
-                </span>
-              </div>
-              {wheelTag(result.multiplier, result.bonus_ep) && (
-                <p className="lk-fade rounded-full bg-amber-400/15 px-3 py-0.5 text-sm font-semibold text-amber-300">
-                  🎡 Lucky Wheel {wheelTag(result.multiplier, result.bonus_ep)}
-                  {result.base_ep != null && ` · ${formatNumber(result.base_ep)} → ${formatNumber(result.ep)} EP`}
-                </p>
-              )}
-              <p className="lk-fade text-sm text-zinc-400">{tierHype(result.tier)}</p>
-            </>
-          )}
-          {!tierShown && <div className="h-[3.75rem]" />}
-        </div>
-      </div>
-
-      {/* Badges */}
-      {result && result.badges.length > 0 && (
-        <ul className="relative w-full max-w-md space-y-2">
-          {badges.map((b, k) => {
-            const shown = k < view.badges;
-            const odds = badgeOneIn(b.slug);
-            const isNew = newSlugs?.has(b.slug);
-            return (
-              <li
-                key={b.slug}
-                className={`flex items-center gap-3 rounded-xl border bg-zinc-900/70 px-4 py-3 ${
-                  shown ? "lk-pop" : "invisible"
-                }`}
-                style={{ borderColor: `${tierColor(b.rarity)}66`, boxShadow: shown && tierRank(b.rarity) >= 4 ? `0 0 24px -6px ${tierColor(b.rarity)}` : undefined }}
-              >
-                <span className="text-3xl" aria-hidden>
-                  {b.emoji}
-                </span>
-                <div className="min-w-0 flex-1 text-left">
-                  <p className="flex items-center gap-2 font-semibold text-zinc-100">
-                    {b.name}
-                    {isNew && (
-                      <span className="rounded bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-950">
-                        New!
-                      </span>
-                    )}
+          <div ref={quakeRef} className={`relative flex w-full flex-col items-center gap-[4vmin] px-3 text-center ${SHAKE_CLASS[shake]}`}>
+            {shock > 0 && <span key={shock} className="lk-shockwave" />}
+            <p className="relative text-[clamp(0.75rem,1.8vmin,1.1rem)] uppercase tracking-[0.4em] text-zinc-500">
+              {result ? `${result.attempt ? rollLabel(result.attempt) : "Your roll"} for ${result.roll_date}` : "Rolling…"}
+            </p>
+            <p
+              className={`relative flex items-end justify-center font-mono text-[clamp(3rem,14vw,13rem)] font-black leading-none tabular-nums ${dim ? "lk-heartbeat" : ""}`}
+              style={{ textShadow: result && view.locked > firstSignificant ? `0 0 ${20 + glow * 40}px ${color}88` : undefined }}
+            >
+              {reelSlots(true)}
+            </p>
+            <div className={`relative flex min-h-[14vmin] flex-col items-center gap-2 ${tierShown ? "" : "invisible"}`}>
+              {tierShown && (
+                <>
+                  <p className="lk-slam text-[clamp(1.75rem,8vmin,5rem)] font-black uppercase leading-none tracking-[0.2em]" style={{ color, textShadow: `0 0 30px ${color}` }}>
+                    {result.tier}
                   </p>
-                  <p className="truncate text-xs text-zinc-500">{b.description}</p>
-                  {odds && <p className="text-[11px] text-zinc-500">{formatOdds(odds)}</p>}
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <Chip value={b.rarity} />
-                  <span className="text-sm font-semibold tabular-nums text-violet-300">+{formatNumber(b.ep)} EP</span>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {result && result.badges.length === 0 && view.tier && (
-        <p className="lk-fade text-sm text-zinc-500">No badges this time. Better luck tomorrow.</p>
+                  <p className="text-[clamp(1.25rem,4vmin,2.5rem)] font-extrabold tabular-nums text-zinc-100">{formatNumber(view.ep)} EP</p>
+                  {wheelTag(result.multiplier, result.bonus_ep) && (
+                    <p className="lk-fade rounded-full bg-amber-400/15 px-4 py-1 text-sm font-semibold text-amber-300">
+                      🎡 Lucky Wheel {wheelTag(result.multiplier, result.bonus_ep)}
+                    </p>
+                  )}
+                  <p className="lk-fade text-sm text-zinc-400">{tierHype(result.tier)}</p>
+                </>
+              )}
+            </div>
+          </div>
+          <p className="absolute bottom-6 text-xs text-zinc-600">Tap anywhere to skip</p>
+        </div>
       )}
 
-      {/* Footer */}
-      {result && view.done ? (
-        <div className="lk-fade flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
-          <p className="text-sm text-zinc-300">{percentileLine(result.base_ep ?? result.ep)}</p>
-          {streak !== undefined && streak > 1 && (
-            <p className="text-sm font-semibold text-orange-300">🔥 {streak}-day streak</p>
-          )}
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <ShareButton result={result} streak={streak} />
-            {onReplay && (
-              <button
-                type="button"
-                onClick={onReplay}
-                className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800"
-              >
-                ↻ Replay reveal
-              </button>
+      {/* The result page. It fades in as the stage fades out. */}
+      <div
+        className={`relative flex w-full flex-col items-center gap-6 transition-opacity duration-500 ${phase === "stage" && !instant ? "opacity-0" : "opacity-100"} ${showStage ? "" : SHAKE_CLASS[shake]}`}
+        onClick={skip}
+        style={{ ["--tier" as string]: color }}
+      >
+        {/* Glow behind the number once the tier lands. */}
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute -top-10 left-1/2 h-64 w-[36rem] max-w-full -translate-x-1/2 rounded-full blur-3xl transition-opacity duration-700 ${
+            tierShown && rank >= 2 ? "opacity-100" : "opacity-0"
+          }`}
+          style={{ background: `radial-gradient(closest-side, ${color}55, transparent)` }}
+        />
+
+        <div className="relative text-center">
+          <p className="text-sm uppercase tracking-widest text-zinc-500">
+            {result ? `${result.attempt ? rollLabel(result.attempt) : "Your roll"} for ${result.roll_date}` : "Rolling…"}
+          </p>
+
+          {/* The reel */}
+          <p
+            className="mt-2 flex items-end justify-center font-mono text-6xl font-bold tabular-nums sm:text-7xl"
+            aria-live="polite"
+            aria-label={view.done && result ? formatNumber(result.number) : undefined}
+          >
+            {reelSlots(false)}
+          </p>
+
+          {/* Tier + EP */}
+          <div className={`mt-5 flex flex-col items-center gap-2 ${tierShown ? "" : "invisible"}`}>
+            {tierShown && (
+              <>
+                <div className="flex items-center gap-3">
+                  <Chip value={result.tier} size="lg" />
+                  <span className="text-2xl font-extrabold tabular-nums" style={{ color }}>
+                    {formatNumber(view.ep)} EP
+                  </span>
+                </div>
+                {wheelTag(result.multiplier, result.bonus_ep) && (
+                  <p className="rounded-full bg-amber-400/15 px-3 py-0.5 text-sm font-semibold text-amber-300">
+                    🎡 Lucky Wheel {wheelTag(result.multiplier, result.bonus_ep)}
+                    {result.base_ep != null && ` · ${formatNumber(result.base_ep)} → ${formatNumber(result.ep)} EP`}
+                  </p>
+                )}
+                <p className="text-sm text-zinc-400">{tierHype(result.tier)}</p>
+              </>
             )}
+            {!tierShown && <div className="h-[3.75rem]" />}
           </div>
         </div>
-      ) : (
-        result && <p className="text-xs text-zinc-600">Tap to skip</p>
-      )}
-    </div>
+
+        {/* Badges, each in its own aura. */}
+        {result && result.badges.length > 0 && (
+          <ul className="relative w-full max-w-md space-y-3">
+            {badges.map((b, k) => {
+              const shown = k < view.badges;
+              const odds = badgeOneIn(b.slug);
+              const isNew = newSlugs?.has(b.slug);
+              return (
+                <li key={b.slug} className={shown ? "lk-pop" : "invisible"}>
+                  <BadgeAura slug={b.slug} rarity={b.rarity} active={shown}>
+                    <div
+                      className="flex items-center gap-3 rounded-xl border bg-zinc-900/90 px-4 py-3"
+                      style={{ borderColor: `${tierColor(b.rarity)}77` }}
+                    >
+                      <span className="text-3xl" aria-hidden>
+                        {b.emoji}
+                      </span>
+                      <div className="min-w-0 flex-1 text-left">
+                        <p className="flex items-center gap-2 font-semibold text-zinc-100">
+                          {b.name}
+                          {isNew && (
+                            <span className="lk-new rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-950">New!</span>
+                          )}
+                        </p>
+                        <p className="truncate text-xs text-zinc-500">{b.description}</p>
+                        {odds && <p className="text-[11px] text-zinc-500">{formatOdds(odds)}</p>}
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <Chip value={b.rarity} />
+                        <span className="text-sm font-semibold tabular-nums text-violet-300">+{formatNumber(b.ep)} EP</span>
+                      </div>
+                    </div>
+                  </BadgeAura>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {result && result.badges.length === 0 && view.tier && phase !== "stage" && (
+          <p className="lk-fade text-sm text-zinc-500">No badges this time. Better luck tomorrow.</p>
+        )}
+
+        {/* Footer */}
+        {result && view.done ? (
+          <div className="lk-fade flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+            <p className="text-sm text-zinc-300">{percentileLine(result.base_ep ?? result.ep)}</p>
+            {streak !== undefined && streak > 1 && <p className="text-sm font-semibold text-orange-300">🔥 {streak}-day streak</p>}
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <ShareButton result={result} streak={streak} />
+              {onReplay && (
+                <button
+                  type="button"
+                  onClick={onReplay}
+                  className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800"
+                >
+                  ↻ Replay reveal
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          result && phase !== "stage" && <p className="text-xs text-zinc-600">Tap to skip</p>
+        )}
+      </div>
     </>
   );
 }
