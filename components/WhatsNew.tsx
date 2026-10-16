@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { sfx } from "@/lib/game/sfx";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { APP_VERSION, CHANGELOG } from "@/lib/version";
 
@@ -44,21 +45,29 @@ export function WhatsNew() {
   function close() {
     markSeen();
     setOpen(false);
+    sfx.close();
+  }
+
+  function show() {
+    setOpen(true);
+    sfx.open();
   }
 
   const entry = CHANGELOG[0];
+  const earlier = CHANGELOG.slice(1);
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={show}
+        data-sfx="none"
         className="text-xs text-zinc-600 underline-offset-4 hover:text-zinc-300 hover:underline"
       >
         v{APP_VERSION} · What&apos;s new
       </button>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" onClick={close} role="presentation">
+        <div className="lk-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" onClick={close} role="presentation">
           <div
             role="dialog"
             aria-modal="true"
@@ -83,6 +92,21 @@ export function WhatsNew() {
                 </li>
               ))}
             </ul>
+            {earlier.map((old) => (
+              <details key={old.version} className="border-t border-zinc-800 px-6 py-3 text-sm">
+                <summary className="cursor-pointer select-none text-zinc-400 hover:text-zinc-200">
+                  Earlier: {old.version}, {old.title}
+                </summary>
+                <ul className="mt-3 flex flex-col gap-2.5">
+                  {old.items.map((item, i) => (
+                    <li key={i} className="flex gap-3">
+                      <span aria-hidden>{item.emoji}</span>
+                      <span className="text-zinc-300">{item.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ))}
             <div className="sticky bottom-0 border-t border-zinc-800 bg-zinc-950/95 px-6 py-4">
               <button
                 type="button"

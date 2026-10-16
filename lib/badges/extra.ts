@@ -39,7 +39,56 @@ const DIGIT_PLURAL = ["Zeros", "Ones", "Twos", "Threes", "Fours", "Fives", "Sixe
 const KEYCAP = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"];
 
 const out: BadgeSpec[] = [];
-const add = (b: BadgeSpec) => out.push(b);
+
+// Replacements for badges that turned out to match exactly the same numbers as
+// an earlier badge (found by the duplicate check in scripts/precompute.ts).
+// A replacement takes the original's slot, so every later id stays put; the
+// original slug is the key. Players' old badge rows are rebuilt by rescore_all().
+const digitProduct = (n: number) => digitsOf(n).reduce((a, b) => a * b, 1);
+const factorialsOfDigits = [1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880];
+const REPLACEMENTS: Record<string, BadgeSpec> = {
+  // was a copy of Pristine Hundred-K (multiples of 100,000)
+  "penta-zeros": {
+    slug: "square-mirror", name: "Square Mirror", emoji: "🪟", family: "square-mirror",
+    description: "Its square is a palindrome (like 26² = 676).",
+    test: (n) => n > 1 && isPalindrome(s(n * n)),
+  },
+  // was a copy of Pristine Hundred-K
+  "zeros-takeover": {
+    slug: "digit-factorials", name: "Digit Factorials", emoji: "🧪", family: "factorion",
+    description: "Equals the sum of the factorials of its digits (like 145 = 1! + 4! + 5!).",
+    test: (n) => n > 0 && digitsOf(n).reduce((t, d) => t + factorialsOfDigits[d], 0) === n,
+  },
+  // was a copy of Beastly (contains 666)
+  "triple-sixes": {
+    slug: "nine-lives", name: "Nine Lives", emoji: "🐈", family: "digital-root",
+    description: "A multiple of 9: its digits add up to 9, 18, 27 …",
+    test: (n) => n > 0 && n % 9 === 0,
+  },
+  // was a copy of Hollow (four or more zeros)
+  "zeros-overload": {
+    slug: "mirror-image", name: "Mirror Image", emoji: "🪞", family: "mirror-image",
+    description: "Three or more digits, all 0, 1 or 8, reading the same in a mirror (like 818).",
+    test: (n) => len(n) >= 3 && /^[018]+$/.test(s(n)) && isPalindrome(s(n)),
+  },
+  // was a copy of Quad Ones (contains 1111)
+  "make-a-wish": {
+    slug: "one-step-wonder", name: "One-Step Wonder", emoji: "👣", family: "reverse-add",
+    description: "Add it to its own reverse and you get a palindrome (like 29 + 92 = 121).",
+    test: (n) => {
+      if (n < 10) return false;
+      const r = reverseNum(n);
+      return r !== n && isPalindrome(s(n + r));
+    },
+  },
+  // was a copy of Double Nines (contains 99)
+  "ninety-nine-problems": {
+    slug: "product-power", name: "Product Power", emoji: "✖️", family: "digit-product",
+    description: "Multiply all its digits together and get 100,000 or more (like 999,999).",
+    test: (n) => digitProduct(n) >= 100_000,
+  },
+};
+const add = (b: BadgeSpec) => out.push(REPLACEMENTS[b.slug] ?? b);
 
 // ---------------------------------------------------------------------------
 // Digit runs: the same digit 2/3/4/5 times in a row, per digit
@@ -476,5 +525,11 @@ add({ slug: "birthday", name: "Birthday", emoji: "🎂", family: "date", descrip
   const days = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   return month >= 1 && month <= 12 && day >= 1 && day <= days[month - 1];
 } });
+
+// ---------------------------------------------------------------------------
+// Appended later (new ids at the end).
+// ---------------------------------------------------------------------------
+add({ slug: "six-seven", name: "Six Seven", emoji: "🙌", family: "meme-67", description: "Contains 67.", test: (n) => has(n, "67") });
+add({ slug: "exactly-sixty-seven", name: "Exactly Six Seven", emoji: "🏅", family: "exact", description: "Exactly 67. The meme itself.", test: (n) => n === 67 });
 
 export const EXTRA_BADGES: readonly BadgeSpec[] = out;

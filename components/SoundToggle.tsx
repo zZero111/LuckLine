@@ -1,22 +1,23 @@
 "use client";
 
-import { useState } from "react";
-import { setSoundEnabled, sfx, soundEnabled } from "@/lib/game/sfx";
+import { useSyncExternalStore } from "react";
+import { onSoundChange, setSoundEnabled, sfx, soundEnabled } from "@/lib/game/sfx";
 
-export function SoundToggle() {
-  const [on, setOn] = useState(soundEnabled);
+/** Mute button. Every instance on the page stays in sync. */
+export function SoundToggle({ compact = false }: { compact?: boolean }) {
+  const on = useSyncExternalStore(onSoundChange, soundEnabled, () => true);
   return (
     <button
       type="button"
       onClick={() => {
         const next = !on;
         setSoundEnabled(next);
-        setOn(next);
-        if (next) sfx.lock(4);
+        if (next) sfx.toggle(true);
       }}
       aria-pressed={on}
-      title={on ? "Sound on" : "Sound off"}
-      className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 transition hover:bg-zinc-800"
+      data-sfx="none"
+      title={on ? "Sound on (click to mute)" : "Sound off (click to unmute)"}
+      className={`rounded-lg border border-zinc-700 text-zinc-300 transition hover:bg-zinc-800 ${compact ? "px-2 py-1 text-sm" : "px-3 py-2 text-sm"}`}
     >
       {on ? "🔊" : "🔇"}
       <span className="sr-only">{on ? "Turn sound off" : "Turn sound on"}</span>

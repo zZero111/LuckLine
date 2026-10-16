@@ -9,7 +9,7 @@ export function UserArea() {
   const { status, displayName, avatarPath } = useAuth();
 
   if (status === "loading") {
-    return <span className="h-8 w-20 animate-pulse rounded-lg bg-zinc-800" />;
+    return <span className="h-8 w-20 lk-shimmer rounded-lg bg-zinc-800" />;
   }
 
   if (status === "signedOut") {
@@ -32,7 +32,7 @@ export function UserArea() {
           Choose a name
         </Link>
       ) : (
-        <span className="h-5 w-16 animate-pulse rounded bg-zinc-800" />
+        <span className="h-5 w-16 lk-shimmer rounded bg-zinc-800" />
       )}
       <Link href="/account" className="text-zinc-400 hover:text-zinc-100">
         Account

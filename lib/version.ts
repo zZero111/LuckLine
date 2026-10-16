@@ -1,6 +1,6 @@
 // Bump APP_VERSION and add an entry to CHANGELOG to show the "What's new"
 // pop-up again to every player on their next visit.
-export const APP_VERSION = "1.1";
+export const APP_VERSION = "1.2";
 
 export interface ChangelogEntry {
   version: string;
@@ -9,6 +9,17 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "1.2",
+    title: "Polish, new badges and a spinning die",
+    items: [
+      { emoji: "🧹", text: "No more twins: 6 badges that matched exactly the same numbers were replaced with brand-new ones. Past rolls were re-checked." },
+      { emoji: "🙌", text: "New 67 badges: Six Seven (any number containing 67) and a mythic for rolling exactly 67." },
+      { emoji: "🎲", text: "The dice logo spins! Hover over it to make it whizz, click it to rattle." },
+      { emoji: "✨", text: "Everything moves smoother: pages slide in, the menu underline glides, lists cascade in, stats count up, and the top 3 get medals on the leaderboard." },
+      { emoji: "🔊", text: "More sound: soft clicks, page whooshes, a dice rattle when you press ROLL and a coin clink when you reroll. Mute everything with the speaker button at the top." },
+    ],
+  },
   {
     version: "1.1",
     title: "The big update",

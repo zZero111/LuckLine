@@ -56,6 +56,7 @@ export function RerollPanel({ balance, price, rerollsLeft, maxPerDay, freeAvaila
           <div className="flex gap-2">
             <button
               type="button"
+              data-sfx={freeAvailable ? "success" : "coin"}
               onClick={() => {
                 setConfirming(false);
                 onReroll();
