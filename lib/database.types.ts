@@ -107,6 +107,20 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"reminder_prefs": {
+                  Row: {
+                    "enabled": boolean,"last_sent": string | null,"token": string,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "enabled"?: boolean,"last_sent"?: string | null,"token"?: string,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "enabled"?: boolean,"last_sent"?: string | null,"token"?: string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"roll_badges": {
                   Row: {
                     "badge_id": number,"roll_id": number
@@ -232,6 +246,9 @@ isOneToOne: false
                            },
 "spin_wheel":
 { Args: Record<PropertyKey, never>; Returns: Json
+                           },
+"unsubscribe_reminders":
+{ Args: { "unsubscribe_token": string }; Returns: boolean
                            }
           }
           Enums: {

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { DiceLogo } from "@/components/DiceLogo";
 import { UserArea } from "@/components/UserArea";
 import { WhatsNew } from "@/components/WhatsNew";
 import { AuthProvider } from "@/lib/supabase/auth-context";
@@ -41,8 +42,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <header className="border-b border-zinc-800">
             <div className="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-3">
               <div className="flex items-center gap-6">
-                <Link href="/" className="text-xl font-extrabold tracking-tight">
-                  <span className="text-violet-400">Luck</span>line
+                <Link href="/" className="flex items-center gap-2 text-xl font-extrabold tracking-tight">
+                  <DiceLogo size={30} />
+                  <span>
+                    <span className="text-violet-400">Luck</span>line
+                  </span>
                 </Link>
                 <nav className="flex gap-4 text-sm text-zinc-400">
                   <Link href="/" className="hover:text-zinc-100">

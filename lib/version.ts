@@ -20,6 +20,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       { emoji: "🎡", text: "The Lucky Wheel: one free spin a day after you roll. Win 2×, 3×, 5× or a 10× jackpot, +200 EP or a free reroll … or lose half." },
       { emoji: "📊", text: "Player stats: tap any name on the leaderboard to see their best roll ever, badges, streaks and more." },
       { emoji: "🖼️", text: "Profile pictures: add yours on the Account page." },
+      { emoji: "🎨", text: "A brand-new dice logo, next to the title and on your browser tab." },
+      { emoji: "📬", text: "Daily reminder emails if you haven't rolled by the evening. Turn them off any time on the Account page or with the link in the email." },
       { emoji: "🔥", text: "Streaks, NEW badge tags, the odds of every badge, how your roll ranks, and share text with coloured squares." },
       { emoji: "🗑️", text: "The Trash tier finally exists. Good luck avoiding it." },
     ],
