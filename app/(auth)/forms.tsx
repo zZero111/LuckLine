@@ -1,6 +1,7 @@
 "use client";
 
 import { AvatarUploader } from "@/components/AvatarUploader";
+import { ReminderToggle } from "@/components/ReminderToggle";
 import { AVATAR_BUCKET } from "@/lib/avatars";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -260,6 +261,11 @@ export function AccountPanel() {
       <section>
         <h2 className="mb-2 text-sm font-semibold text-zinc-300">Profile picture</h2>
         <AvatarUploader />
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-sm font-semibold text-zinc-300">Emails</h2>
+        <ReminderToggle />
       </section>
 
       <dl className="space-y-2 text-sm">
