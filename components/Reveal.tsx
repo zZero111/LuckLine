@@ -126,13 +126,15 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
     }
     t += 150 + steps * 33 + 250;
     const sorted = [...result.badges].sort((a, b) => a.ep - b.ep);
+    // Keep long badge lists snappy: about 3.4 s at most for all of them.
+    const step = Math.min(340, Math.floor(3400 / Math.max(1, sorted.length)));
     sorted.forEach((b, k) => {
-      at(t + k * 340, () => {
+      at(t + k * step, () => {
         setStage((s) => ({ ...s, badges: k + 1 }));
         sfx.badge(tierRank(b.rarity));
       });
     });
-    t += sorted.length * 340 + 200;
+    t += sorted.length * step + 200;
     at(t, () => setStage((s) => ({ ...s, done: true })));
     const pending = timers.current;
     return () => {
