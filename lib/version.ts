@@ -1,0 +1,27 @@
+// Bump APP_VERSION and add an entry to CHANGELOG to show the "What's new"
+// pop-up again to every player on their next visit.
+export const APP_VERSION = "1.1";
+
+export interface ChangelogEntry {
+  version: string;
+  title: string;
+  items: { emoji: string; text: string }[];
+}
+
+export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "1.1",
+    title: "The big update",
+    items: [
+      { emoji: "💎", text: "369 badges to collect (up from 30), with a searchable Badges page. Related badges form families: only the best one in each family counts." },
+      { emoji: "📈", text: "Bigger EP: a badge now pays its odds, so a 1-in-5,000 badge is worth 5,000 EP." },
+      { emoji: "🎰", text: "A dramatic new roll reveal: digits slam in one by one, rare rolls tease the last digit, and the rarest shake the screen." },
+      { emoji: "🎲", text: "Rerolls: spend 400 EP for another roll, up to 3 a day. Your best roll of the day is the one that counts." },
+      { emoji: "🎡", text: "The Lucky Wheel: one free spin a day after you roll. Win 2×, 3×, 5× or a 10× jackpot, +200 EP or a free reroll … or lose half." },
+      { emoji: "📊", text: "Player stats: tap any name on the leaderboard to see their best roll ever, badges, streaks and more." },
+      { emoji: "🖼️", text: "Profile pictures: add yours on the Account page." },
+      { emoji: "🔥", text: "Streaks, NEW badge tags, the odds of every badge, how your roll ranks, and share text with coloured squares." },
+      { emoji: "🗑️", text: "The Trash tier finally exists. Good luck avoiding it." },
+    ],
+  },
+];
