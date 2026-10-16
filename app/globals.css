@@ -84,6 +84,88 @@ body {
 }
 .lk-pulse { animation: lk-pulse 1.8s ease-in-out infinite; }
 
+/* --- Polish: transitions, hover, loading ---------------------------------- */
+
+html { scroll-behavior: smooth; }
+
+:focus-visible {
+  outline: 2px solid #8b5cf6;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Pages ease in on every navigation (app/template.tsx). */
+@keyframes lk-page-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.lk-page { animation: lk-page-in 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+
+/* Tab / filter content swaps. */
+@keyframes lk-tab-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.99); }
+  to { opacity: 1; transform: none; }
+}
+.lk-tab-in { animation: lk-tab-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+
+/* Table rows and cards cascade in; set --i (0..) per item. */
+@keyframes lk-row-in {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: none; }
+}
+.lk-row { animation: lk-row-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 35ms); }
+
+@keyframes lk-card-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+.lk-card { animation: lk-card-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 30ms); }
+
+/* Things you can hover rise a little. */
+.lk-lift { transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease; }
+.lk-lift:hover { transform: translateY(-3px); box-shadow: 0 10px 28px -12px rgb(139 92 246 / 0.45); }
+
+/* Buttons press in. */
+button:not(:disabled):active, [role="switch"]:active { transform: scale(0.96); }
+button, [role="switch"] { transition-property: transform, background-color, border-color, color, opacity, box-shadow; transition-duration: 0.15s; }
+
+/* Loading placeholders shimmer instead of pulsing. */
+@keyframes lk-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+.lk-shimmer {
+  background: linear-gradient(100deg, #18181b 30%, #27272a 50%, #18181b 70%);
+  background-size: 200% 100%;
+  animation: lk-shimmer 1.6s linear infinite;
+}
+
+/* A gleam across the NEW! tag. */
+@keyframes lk-gleam {
+  0%, 60% { background-position: 200% 0; }
+  100% { background-position: -100% 0; }
+}
+.lk-new {
+  background-image: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.65) 50%, transparent 65%);
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  background-color: #fbbf24;
+  animation: lk-gleam 2.4s ease-in-out infinite;
+}
+
+/* Medals for the top three. */
+@keyframes lk-medal {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  30% { transform: rotate(-12deg) scale(1.15); }
+  60% { transform: rotate(8deg) scale(1.1); }
+}
+.lk-medal { display: inline-block; animation: lk-medal 3.5s ease-in-out infinite; }
+
+/* Dialog backdrop. */
+@keyframes lk-backdrop { from { opacity: 0; } to { opacity: 1; } }
+.lk-backdrop { animation: lk-backdrop 0.25s ease-out; }
+
+/* The roll button breathes. */
 /* Home-page logo: a gentle idle wobble. */
 @keyframes lk-logo-wobble {
   0%, 100% { transform: rotate(0deg); }
@@ -146,6 +228,9 @@ body {
 .lk-heartbeat { animation: lk-heartbeat 0.7s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .lk-page, .lk-tab-in, .lk-row, .lk-card, .lk-shimmer, .lk-new, .lk-medal, .lk-backdrop { animation: none; }
+  .lk-lift:hover { transform: none; }
   .lk-logo-wobble, .lk-thud, .lk-shake-s, .lk-shake-m, .lk-shake-xl, .lk-heartbeat { animation: none; }
   .lk-flash { display: none; }
   .lk-lock, .lk-tease, .lk-slam, .lk-pop, .lk-fade, .lk-shake, .lk-pulse { animation: none; }

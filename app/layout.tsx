@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { DiceLogo } from "@/components/DiceLogo";
+import { NavLinks } from "@/components/NavLinks";
+import { SiteLogo } from "@/components/SiteLogo";
+import { SoundToggle } from "@/components/SoundToggle";
+import { UiFx } from "@/components/UiFx";
 import { UserArea } from "@/components/UserArea";
 import { WhatsNew } from "@/components/WhatsNew";
 import { AuthProvider } from "@/lib/supabase/auth-context";
@@ -39,31 +41,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="flex min-h-full flex-col bg-zinc-950 text-zinc-100">
         <AuthProvider>
-          <header className="border-b border-zinc-800">
-            <div className="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-              <div className="flex items-center gap-6">
-                <Link href="/" className="flex items-center gap-2 text-xl font-extrabold tracking-tight">
-                  <DiceLogo size={30} />
-                  <span>
-                    <span className="text-violet-400">Luck</span>line
-                  </span>
-                </Link>
-                <nav className="flex gap-4 text-sm text-zinc-400">
-                  <Link href="/" className="hover:text-zinc-100">
-                    Play
-                  </Link>
-                  <Link href="/leaderboard" className="hover:text-zinc-100">
-                    Leaderboard
-                  </Link>
-                  <Link href="/badges" className="hover:text-zinc-100">
-                    Badges
-                  </Link>
-                  <Link href="/profile" className="hover:text-zinc-100">
-                    Profile
-                  </Link>
-                </nav>
+          <UiFx />
+          <header className="sticky top-0 z-30 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md">
+            <div className="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-2.5">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+                <SiteLogo />
+                <NavLinks />
               </div>
-              <UserArea />
+              <div className="flex items-center gap-3">
+                <SoundToggle compact />
+                <UserArea />
+              </div>
             </div>
           </header>
           <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 py-10">{children}</main>
