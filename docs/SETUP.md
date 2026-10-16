@@ -73,6 +73,25 @@ transaction (a minute or two) rolls still work and are rescored by
 `rescore_all()`; the old site keeps working against the new schema until the
 new one deploys.
 
+### Version 1.2: duplicate badges replaced, 67 badges, spinning die, polish
+
+Badge **data** only; there is no new migration, so no `db push`. Existing rolls
+are rescored (Lucky Wheel multipliers and spent EP are kept), which removes the
+old duplicate badges from past rolls.
+
+```bash
+git pull && npm ci
+npm run precompute          # about 40 s. It now also fails if two badges ever match the same numbers
+psql "$LUCKLINE_DB" -1 -v ON_ERROR_STOP=1 \
+  -f supabase/seed.sql \
+  -c "truncate public.number_stats" \
+  -c "\copy public.number_stats from 'supabase/seed/number_stats.csv' csv" \
+  -c "select private.rescore_all()"
+# expect "INSERT 0 371", "COPY 1000001", then the rescore_all row
+```
+
+Then merge the PR. The 1.2 "What's new" pop-up shows once to every player.
+
 ### Dice logo and daily reminder emails
 
 ```bash
