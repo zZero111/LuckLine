@@ -73,7 +73,7 @@ transaction (a minute or two) rolls still work and are rescored by
 `rescore_all()`; the old site keeps working against the new schema until the
 new one deploys.
 
-### Version 1.1.3: 3D die, full-screen roll, badge auras, podium frames
+### Version 1.1.2: 3D die, full-screen roll, badge auras, podium frames
 
 Front-end only: no migration and no data load, so no `db push` and no psql.
 
@@ -81,9 +81,9 @@ Front-end only: no migration and no data load, so no `db push` and no psql.
 git pull && npm ci
 ```
 
-Then merge the PR. The 1.1.3 "What's new" pop-up shows once to every player.
+Then merge the PR. The 1.1.2 "What's new" pop-up shows once to every player.
 
-### Version 1.1.2: duplicate badges replaced, 67 badges, spinning die, polish
+### Version 1.1.1: duplicate badges replaced, 67 badges, spinning die, polish
 
 Badge **data** only; there is no new migration, so no `db push`. Existing rolls
 are rescored (Lucky Wheel multipliers and spent EP are kept), which removes the
@@ -100,7 +100,7 @@ psql "$LUCKLINE_DB" -1 -v ON_ERROR_STOP=1 \
 # expect "INSERT 0 371", "COPY 1000001", then the rescore_all row
 ```
 
-Then merge the PR. The 1.1.2 "What's new" pop-up shows once to every player.
+Then merge the PR. The 1.1.1 "What's new" pop-up shows once to every player.
 
 ### Dice logo and daily reminder emails
 
@@ -143,7 +143,7 @@ haven't rolled yet that day and rolled in the last 14 days. See past runs with
 - Sending from a Gmail address works, but some mail may land in spam. A custom
   domain verified in Brevo fixes that if you get one later.
 
-### Version 1.1.1: player stats, more dramatic rolls, "What's new" pop-up
+### Version 1.1: player stats, more dramatic rolls, "What's new" pop-up
 
 ```bash
 git pull && npm ci
