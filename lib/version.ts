@@ -1,6 +1,6 @@
 // Bump APP_VERSION and add an entry to CHANGELOG to show the "What's new"
 // pop-up again to every player on their next visit.
-export const APP_VERSION = "1.3";
+export const APP_VERSION = "1.1.3";
 
 export interface ChangelogEntry {
   version: string;
@@ -10,7 +10,7 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.3",
+    version: "1.1.3",
     title: "A real die, glowing badges and a bigger roll",
     items: [
       { emoji: "🎲", text: "The logo is now a real 3D die, tumbling on every axis like it's been thrown. Hover to make it whirl." },
@@ -20,7 +20,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: "1.2",
+    version: "1.1.2",
     title: "Polish, new badges and a spinning die",
     items: [
       { emoji: "🧹", text: "No more twins: 6 badges that matched exactly the same numbers were replaced with brand-new ones. Past rolls were re-checked." },
@@ -31,7 +31,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: "1.1",
+    version: "1.1.1",
     title: "The big update",
     items: [
       { emoji: "💎", text: "369 badges to collect (up from 30), with a searchable Badges page. Related badges form families: only the best one in each family counts." },
