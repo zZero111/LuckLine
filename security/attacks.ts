@@ -489,7 +489,8 @@ async function main() {
     c.expect(rows === "4,3", `rolls count,max attempt = ${rows}`);
     const gained = Number(psql(`select coalesce(sum(ep), 0) from public.rolls where user_id = ${sqlStr(H.id)} and attempt > 0`));
     const w1 = psql(`select earned_ep||','||spent_ep from public.ep_wallets where user_id = ${sqlStr(H.id)}`).split(",").map(Number);
-    c.expect(w1[1] - w0[1] === 300, `spent_ep grew by ${w1[1] - w0[1]}, expected 300`);
+    const price = Number(psql("select private.reroll_price()"));
+    c.expect(w1[1] - w0[1] === 3 * price, `spent_ep grew by ${w1[1] - w0[1]}, expected ${3 * price}`);
     c.expect(w1[0] - w0[0] === gained, `earned_ep grew by ${w1[0] - w0[0]}, rerolls earned ${gained}`);
     const day = psql(`select t.total_ep = (select max(ep) from public.rolls where user_id = ${sqlStr(H.id)}) and t.roll_count = 1 from public.leaderboard_totals t where user_id = ${sqlStr(H.id)}`);
     c.expect(day === "t", "leaderboard total is not the day's best roll / roll_count != 1");
@@ -584,12 +585,13 @@ async function main() {
       c.expect(psql(`select spent_ep from public.ep_wallets where user_id = ${sqlStr(F.id)}`) === "0", "free reroll charged EP");
       const poor = await F.client.rpc("reroll_today");
       c.expect(!!poor.error, `second reroll with no EP should fail: ${describe(poor)}`);
-      psql(`update public.ep_wallets set earned_ep = earned_ep + 10000 where user_id = ${sqlStr(F.id)}`);
+      psql(`update public.ep_wallets set earned_ep = earned_ep + 100000 where user_id = ${sqlStr(F.id)}`);
       const paid = [];
       for (let i = 0; i < 4; i++) paid.push(await F.client.rpc("reroll_today"));
       c.expect(paid.slice(0, 3).every((x) => !x.error) && !!paid[3].error, `3 paid rerolls then refusal: ${paid.map((x) => (x.error ? x.error.message : "ok")).join(" / ")}`);
       const fr = psql(`select count(*)||','||max(attempt)||','||(select spent_ep from public.ep_wallets where user_id = ${sqlStr(F.id)}) from public.rolls where user_id = ${sqlStr(F.id)}`);
-      c.expect(fr === "5,4,300", `rolls,max attempt,spent after free + 3 paid: ${fr}`);
+      const price = Number(psql("select private.reroll_price()"));
+      c.expect(fr === `5,4,${3 * price}`, `rolls,max attempt,spent after free + 3 paid: ${fr}`);
 
       // Rescoring keeps the wheel multiplier.
       psql("select private.rescore_all()");

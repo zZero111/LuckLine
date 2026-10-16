@@ -73,6 +73,26 @@ transaction (a minute or two) rolls still work and are rescored by
 `rescore_all()`; the old site keeps working against the new schema until the
 new one deploys.
 
+### Adding the badge expansion (96 → 369 badges)
+
+A migration (reroll price 400 EP, wheel bonus +200 EP) plus new badge data.
+Existing rolls are kept and rescored; Lucky Wheel multipliers and EP already
+spent are preserved.
+
+```bash
+git pull && npm ci
+npx supabase db push        # applies 20261019120000_badge_expansion_economy.sql
+npm run precompute          # about 40 s
+psql "$LUCKLINE_DB" -1 -v ON_ERROR_STOP=1 \
+  -f supabase/seed.sql \
+  -c "truncate public.number_stats" \
+  -c "\copy public.number_stats from 'supabase/seed/number_stats.csv' csv" \
+  -c "select private.rescore_all()"
+# expect "INSERT 0 369", "COPY 1000001", then the rescore_all row
+```
+
+Then merge the PR.
+
 ### Adding the Lucky Wheel
 
 One migration, no data to load:
