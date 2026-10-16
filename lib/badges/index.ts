@@ -24,11 +24,12 @@ import {
   isPalindrome,
   isPerfectCube,
   isPerfectSquare,
-  isPrime,
   isTriangular,
   longestRepeat,
   longestStep,
 } from "./helpers";
+import { EXTRA_BADGES } from "./extra";
+import { isPrimeFast } from "./numberTheory";
 
 export type Rarity = "common" | "uncommon" | "rare" | "epic" | "anomaly" | "mythic";
 export type Tier = "trash" | Rarity;
@@ -116,10 +117,10 @@ function oddOneOut(t: string) {
   return counts.size === 2 && [...counts.values()].includes(1);
 }
 
-export const BADGES: readonly Badge[] = [
+const CORE_BADGES: readonly Badge[] = [
   { id: 1, slug: "mirror", name: "Mirror", emoji: "🪞", family: "palindrome", description: "Reads the same forwards and backwards.", test: (n) => isPalindrome(s(n)) },
   { id: 2, slug: "grand-mirror", name: "Grand Mirror", emoji: "🔮", family: "palindrome", description: "A six-digit number that reads the same both ways.", test: (n) => six(n) && isPalindrome(s(n)) },
-  { id: 3, slug: "indivisible", name: "Indivisible", emoji: "🧱", family: "prime", description: "A prime: only 1 and itself divide it.", test: (n) => isPrime(n) },
+  { id: 3, slug: "indivisible", name: "Indivisible", emoji: "🧱", family: "prime", description: "A prime: only 1 and itself divide it.", test: (n) => isPrimeFast(n) },
   { id: 4, slug: "triplet", name: "Triplet", emoji: "🎲", family: "repeat", description: "The same digit three times in a row.", test: (n) => longestRepeat(s(n)) >= 3 },
   { id: 5, slug: "quartet", name: "Quartet", emoji: "🎻", family: "repeat", description: "The same digit four times in a row.", test: (n) => longestRepeat(s(n)) >= 4 },
   { id: 6, slug: "quintet", name: "Quintet", emoji: "🖐️", family: "repeat", description: "The same digit five times in a row.", test: (n) => longestRepeat(s(n)) >= 5 },
@@ -188,9 +189,9 @@ export const BADGES: readonly Badge[] = [
   { id: 68, slug: "deep-dive", name: "Deep Dive", emoji: "🤿", family: "sorted", description: "Five or more digits, each smaller than the last (like 97420).", test: (n) => s(n).length >= 5 && strictlyIncreasing(reversed(s(n))) },
   { id: 69, slug: "escalator", name: "Escalator", emoji: "🛗", family: "staircase", description: "Five digits in a row stepping by one, up or down.", test: (n) => longestStep(s(n), 1) >= 5 || longestStep(s(n), -1) >= 5 },
   { id: 70, slug: "full-flight", name: "Full Flight", emoji: "🪜", family: "staircase", description: "All six digits stepping by one (like 456789).", test: (n) => longestStep(s(n), 1) >= 6 || longestStep(s(n), -1) >= 6 },
-  { id: 71, slug: "prime-mirror", name: "Prime Mirror", emoji: "💠", family: "prime", description: "A prime that is also a palindrome.", test: (n) => n > 9 && isPrime(n) && isPalindrome(s(n)) },
-  { id: 72, slug: "twin-prime", name: "Twin Prime", emoji: "👯", family: "prime", description: "A prime with another prime exactly 2 away.", test: (n) => isPrime(n) && (isPrime(n - 2) || isPrime(n + 2)) },
-  { id: 73, slug: "emirp", name: "Emirp", emoji: "🔄", family: "prime", description: "A prime that turns into a different prime backwards.", test: (n) => isPrime(n) && reverseNumber(n) !== n && isPrime(reverseNumber(n)) },
+  { id: 71, slug: "prime-mirror", name: "Prime Mirror", emoji: "💠", family: "prime", description: "A prime that is also a palindrome.", test: (n) => n > 9 && isPrimeFast(n) && isPalindrome(s(n)) },
+  { id: 72, slug: "twin-prime", name: "Twin Prime", emoji: "👯", family: "prime", description: "A prime with another prime exactly 2 away.", test: (n) => isPrimeFast(n) && (isPrimeFast(n - 2) || isPrimeFast(n + 2)) },
+  { id: 73, slug: "emirp", name: "Emirp", emoji: "🔄", family: "prime", description: "A prime that turns into a different prime backwards.", test: (n) => isPrimeFast(n) && reverseNumber(n) !== n && isPrimeFast(reverseNumber(n)) },
   { id: 74, slug: "factorial", name: "Factorial", emoji: "❗", family: "factorial", description: "A factorial: 1, 2, 6, 24, 120, 720 …", test: (n) => FACTORIALS.includes(n) },
   { id: 75, slug: "triangular", name: "Triangular", emoji: "🔺", family: "triangular", description: "A triangular number: 1 + 2 + 3 + … + k.", test: (n) => n > 0 && isTriangular(n) },
   { id: 76, slug: "perfect", name: "Perfect", emoji: "🌟", family: "perfect", description: "A perfect number: the sum of its own divisors (6, 28, 496, 8128).", test: (n) => n === 6 || n === 28 || n === 496 || n === 8128 },
@@ -214,6 +215,12 @@ export const BADGES: readonly Badge[] = [
   { id: 94, slug: "valley", name: "Valley", emoji: "🏞️", family: "shape", description: "Five or more digits that fall to a low, then climb (like 85148).", test: (n) => s(n).length >= 5 && isValley(s(n)) },
   { id: 95, slug: "hollow", name: "Hollow", emoji: "🍩", family: "zeros", description: "Four or more zeros.", test: (n) => countDigit(s(n), "0") >= 4 },
   { id: 96, slug: "unlucky-thirteen", name: "Unlucky Thirteen", emoji: "🐈‍⬛", family: "meme-13", description: "Contains 13.", test: (n) => has(n, "13") },
+];
+
+/** Core badges (1-96) plus the expansion in extra.ts (97+, ids by position). */
+export const BADGES: readonly Badge[] = [
+  ...CORE_BADGES,
+  ...EXTRA_BADGES.map((b, i) => ({ ...b, id: CORE_BADGES.length + 1 + i })),
 ];
 
 // ---------------------------------------------------------------------------

@@ -66,8 +66,8 @@ describe("badge tests", () => {
     expect(slugsOf(1000)).toContain("cubed");
   });
   it("a plain number gets nothing", () => {
-    expect(matchBadges(102062)).toEqual([]);
-    expect(scoreNumber(102062, new Map()).ep).toBe(0);
+    expect(matchBadges(102868)).toEqual([]);
+    expect(scoreNumber(102868, new Map()).ep).toBe(0);
   });
   it("scoreNumber sums badge EP", () => {
     const ep = new Map(BADGES.map((b) => [b.id, b.id * 10]));
@@ -86,7 +86,8 @@ describe("families", () => {
     expect(ids).toContain(bySlug.get("monochrome"));
     for (const slug of ["double-take", "triplet", "quartet", "quintet"]) expect(ids).not.toContain(bySlug.get(slug));
     // Different families still stack.
-    expect(ids).toContain(bySlug.get("jackpot"));
+    expect(ids).toContain(bySlug.get("penta-sevens"));
+    expect(ids).not.toContain(bySlug.get("jackpot"));
   });
   it("ties in a family keep the lowest id", () => {
     const ep = new Map(BADGES.map((b) => [b.id, 1]));

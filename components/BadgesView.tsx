@@ -15,6 +15,9 @@ type Loaded = { badges: CatalogBadge[]; counts: Map<string, number> | null; fail
 export function BadgesView() {
   const { status, user } = useAuth();
   const [data, setData] = useState<Loaded | null>(null);
+  const [query, setQuery] = useState("");
+  const [rarity, setRarity] = useState<string>("all");
+  const [show, setShow] = useState<"all" | "have" | "missing">("all");
   const userId = user?.id;
 
   useEffect(() => {
@@ -54,6 +57,18 @@ export function BadgesView() {
   const collected = counts ? badges.filter((b) => counts.has(b.slug)).length : 0;
   const familySize = new Map<string, number>();
   for (const b of badges) familySize.set(b.family, (familySize.get(b.family) ?? 0) + 1);
+  const q = query.trim().toLowerCase();
+  const visible = badges.filter(
+    (b) =>
+      (rarity === "all" || b.rarity === rarity) &&
+      (show === "all" || (show === "have") === !!counts?.has(b.slug)) &&
+      (!q || b.name.toLowerCase().includes(q) || b.description.toLowerCase().includes(q) || b.family.includes(q)),
+  );
+  const RARITIES = ["all", "mythic", "anomaly", "epic", "rare", "uncommon", "common"];
+  const pill = (active: boolean) =>
+    `rounded-full px-3 py-1 text-xs font-medium capitalize transition ${
+      active ? "bg-violet-600 text-white" : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+    }`;
 
   return (
     <>
@@ -76,8 +91,36 @@ export function BadgesView() {
         A badge&apos;s EP is its odds: a 1-in-5,000 badge pays 5,000 EP. Badges in the same family don&apos;t stack, so a
         roll only scores the best one it hits in each family.
       </p>
+      <div className="flex flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={`Search ${badges.length} badges (try "prime", "777", "hex")`}
+          className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-500"
+        />
+        <div className="flex flex-wrap gap-2">
+          {RARITIES.map((r) => (
+            <button key={r} type="button" className={pill(rarity === r)} onClick={() => setRarity(r)}>
+              {r === "all" ? "All rarities" : r}
+            </button>
+          ))}
+        </div>
+        {counts && (
+          <div className="flex flex-wrap gap-2">
+            {(["all", "have", "missing"] as const).map((v) => (
+              <button key={v} type="button" className={pill(show === v)} onClick={() => setShow(v)}>
+                {v === "all" ? "All" : v === "have" ? "Collected" : "Missing"}
+              </button>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-zinc-500">
+          Showing {visible.length} of {badges.length}
+        </p>
+      </div>
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {badges.map((b) => {
+        {visible.map((b) => {
           const times = counts?.get(b.slug) ?? 0;
           const owned = times > 0;
           const odds = badgeOneIn(b.slug);
