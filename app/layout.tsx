@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { UserArea } from "@/components/UserArea";
+import { WhatsNew } from "@/components/WhatsNew";
 import { AuthProvider } from "@/lib/supabase/auth-context";
 import "./globals.css";
 
@@ -62,6 +63,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </div>
           </header>
           <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 py-10">{children}</main>
+          <footer className="mx-auto w-full max-w-4xl px-4 pb-6 text-center">
+            <WhatsNew />
+          </footer>
         </AuthProvider>
       </body>
     </html>

@@ -218,6 +218,9 @@ isOneToOne: false
 "delete_my_account":
 { Args: Record<PropertyKey, never>; Returns: undefined
                            },
+"player_stats":
+{ Args: { "target_name": string }; Returns: Json
+                           },
 "reroll_terms":
 { Args: Record<PropertyKey, never>; Returns: Json
                            },

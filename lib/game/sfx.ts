@@ -67,6 +67,11 @@ export const sfx = {
     tone(110, 0, 0.9, "sawtooth", 0.025);
     tone(116.5, 0, 0.9, "sawtooth", 0.02);
   },
+  /** A low double thump, for the tension before a very rare roll lands. */
+  heartbeat() {
+    tone(62, 0, 0.16, "sine", 0.22);
+    tone(55, 0.17, 0.2, "sine", 0.16);
+  },
   /** rank: 1 common … 6 mythic */
   badge(rank: number) {
     const base = SCALE[Math.min(rank + 1, SCALE.length - 2)];
