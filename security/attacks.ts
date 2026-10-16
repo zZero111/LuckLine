@@ -703,6 +703,33 @@ async function main() {
     }
     c.done();
   }
+
+  // ---------------------------------------------------------------- ATK-20
+  {
+    const c = new Check("ATK-20", "reminder emails: tokens unreadable, own prefs only, unsubscribe needs the exact token");
+    const anonRead = await anon.from("reminder_prefs").select("*");
+    c.expect(deniedRead(anonRead), `anon reads reminder_prefs: ${describe(anonRead)}`);
+    const own = await A.client.from("reminder_prefs").select("user_id, enabled");
+    c.expect(!own.error && (own.data ?? []).every((r) => r.user_id === A.id) && (own.data ?? []).length === 1, `A reads own prefs: ${describe(own)}`);
+    const tok = await A.client.from("reminder_prefs").select("token");
+    c.expect(!!tok.error, `A reads own token column: ${describe(tok)}`);
+    const star = await A.client.from("reminder_prefs").select("*");
+    c.expect(!!star.error, `A selects * (includes token): ${describe(star)}`);
+    const theirs = await A.client.from("reminder_prefs").update({ enabled: false }).eq("user_id", B.id).select("user_id");
+    c.expect(!!theirs.error || (theirs.data ?? []).length === 0, `A turns off B's reminders: ${describe(theirs)}`);
+    const sneaky = await A.client.from("reminder_prefs").update({ last_sent: "2001-01-01" }).eq("user_id", A.id).select("user_id");
+    c.expect(!!sneaky.error, `A edits own last_sent: ${describe(sneaky)}`);
+    const guess = await anon.rpc("unsubscribe_reminders", { unsubscribe_token: "00000000-0000-0000-0000-000000000000" });
+    c.expect(!guess.error && guess.data === false, `guessed token: ${describe(guess)}`);
+    const bTok = psql(`select token from public.reminder_prefs where user_id = ${sqlStr(B.id)}`);
+    const real = await anon.rpc("unsubscribe_reminders", { unsubscribe_token: bTok });
+    c.expect(!real.error && real.data === true, `real token: ${describe(real)}`);
+    c.expect(psql(`select enabled from public.reminder_prefs where user_id = ${sqlStr(B.id)}`) === "f", "B still subscribed after unsubscribe");
+    for (const fn of ["send_daily_reminders(text)", "streak_ending(uuid,date)"]) {
+      c.expect(psql(`select has_function_privilege('authenticated', 'private.${fn}', 'EXECUTE')`) === "f", `authenticated can run private.${fn}`);
+    }
+    c.done();
+  }
 }
 
 main()

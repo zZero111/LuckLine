@@ -73,6 +73,47 @@ transaction (a minute or two) rolls still work and are rescored by
 `rescore_all()`; the old site keeps working against the new schema until the
 new one deploys.
 
+### Dice logo and daily reminder emails
+
+```bash
+git pull && npm ci
+npx supabase db push        # applies 20261021120000_daily_reminders.sql
+```
+
+Then merge the PR. The logo and tab icon need nothing else. Emails stay **off**
+until you connect a sender:
+
+1. **Create a free Brevo account** at brevo.com (300 emails/day free).
+2. **Verify a sender address:** Brevo → *Senders, domains & dedicated IPs* →
+   *Senders* → *Add a sender* (e.g. your Gmail), then click the link Brevo emails you.
+3. **Create an API key:** Brevo → *SMTP & API* → *API keys* → *Generate a new
+   API key*. It starts with `xkeysib-`. Don't paste it anywhere except step 4.
+4. **Connect it** in the Supabase dashboard → *SQL Editor* (replace the three values):
+
+   ```sql
+   select vault.create_secret('xkeysib-PASTE-YOUR-KEY', 'brevo_api_key');
+
+   update private.reminder_settings
+      set enabled = true,
+          sender_email = 'you@gmail.com',      -- the address you verified in step 2
+          sender_name = 'Luckline',
+          site_url = 'https://zzero111.github.io/RNGdle-2';
+   ```
+
+5. **Send yourself a test:** `select private.send_daily_reminders('you@gmail.com');`
+   then check the result with
+   `select status_code, content from net._http_response order by id desc limit 1;`
+   (201 = sent). Check your spam folder the first time.
+
+Reminders then go out every day at 17:55 UTC to players who have them on,
+haven't rolled yet that day and rolled in the last 14 days. See past runs with
+`select * from private.reminder_runs order by id desc limit 10;`.
+
+- Pause all emails: `update private.reminder_settings set enabled = false;`
+- Change the key: `select vault.update_secret((select id from vault.secrets where name = 'brevo_api_key'), 'xkeysib-NEW-KEY');`
+- Sending from a Gmail address works, but some mail may land in spam. A custom
+  domain verified in Brevo fixes that if you get one later.
+
 ### Version 1.1: player stats, more dramatic rolls, "What's new" pop-up
 
 ```bash
