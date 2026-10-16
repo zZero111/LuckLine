@@ -10,7 +10,8 @@ import { ShareButton } from "./ShareButton";
 import { SoundToggle } from "./SoundToggle";
 import { formatNumber, rollLabel, wheelTag, type RollResultData } from "./types";
 
-const SLOTS = 7; // 0 … 1,000,000 fits in seven digits: d,ddd,ddd
+const SLOTS = 7;
+const SHAKE_CLASS = ["", "lk-shake-s", "lk-shake-m", "lk-shake", "lk-shake-xl"]; // 0 … 1,000,000 fits in seven digits: d,ddd,ddd
 
 function randomReel(): string[] {
   return Array.from({ length: SLOTS }, () => String(Math.floor(Math.random() * 10)));
@@ -64,8 +65,21 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
   const view: Stage = instant && result ? finalStage(result) : stage;
   const [reel, setReel] = useState<string[]>(() => randomReel());
   const [burst, setBurst] = useState(0); // confetti trigger
-  const [shake, setShake] = useState(false);
+  // 0 none, 1 small … 4 earthquake. Set when the tier lands.
+  const [shake, setShake] = useState(0);
+  const [dim, setDim] = useState(false); // spotlight on the number while it teases
+  const [flash, setFlash] = useState(0); // full-screen flash trigger
   const timers = useRef<number[]>([]);
+  const reelRef = useRef<HTMLParagraphElement>(null);
+
+  /** Restart a one-shot CSS animation on the reel (a thud per locked digit). */
+  const thud = () => {
+    const el = reelRef.current;
+    if (!el) return;
+    el.classList.remove("lk-thud");
+    void el.offsetWidth;
+    el.classList.add("lk-thud");
+  };
 
   // Badges in ascending EP so the best one lands last.
   const badges = result ? [...result.badges].sort((a, b) => a.ep - b.ep) : [];
@@ -90,41 +104,52 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
     if (!result || instant) return;
     const at = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms));
     const r = tierRank(result.tier);
-    let t = 250;
+    // Suspense on the last digit grows with rarity (rare .. mythic).
+    const TEASE = [0, 0, 0, 1100, 1700, 2500, 3300];
+    let t = 450;
     for (let i = 0; i < SLOTS; i++) {
       const last = i === SLOTS - 1;
       if (last && r >= 3) {
         at(t, () => {
           setStage((s) => ({ ...s, suspense: true }));
+          if (r >= 5) setDim(true);
           sfx.suspense();
         });
-        t += r >= 4 ? 1200 : 750;
+        // Heartbeats while the last digit teases on the rarest rolls.
+        if (r >= 5) for (let h = 500; h < TEASE[r] - 200; h += 700) at(t + h, () => sfx.heartbeat());
+        t += TEASE[r];
       }
-      // Leading zeros lock quickly; real digits get a beat each.
-      t += i < firstSignificant ? 90 : 190;
+      // Leading zeros lock quickly; real digits get a heavy beat each.
+      t += i < firstSignificant ? 110 : 300;
       at(t, () => {
         setStage((s) => ({ ...s, locked: i + 1, suspense: false }));
         sfx.lock(i);
+        if (i >= firstSignificant) thud();
       });
     }
-    t += 380;
+    t += r >= 5 ? 650 : 450;
     at(t, () => {
+      setDim(false);
       setStage((s) => ({ ...s, tier: true }));
       sfx.tier(r);
       if (r >= 4) setBurst((b) => b + 1);
-      if (r >= 3) vibrate(r >= 5 ? [60, 40, 60, 40, 180] : [40, 30, 80]);
-      if (r >= 6) {
-        setShake(true);
-        at(700, () => setShake(false));
+      if (r >= 6) at(450, () => setBurst((b) => b + 1)); // second wave
+      if (r >= 5) setFlash((f) => f + 1);
+      if (r >= 3) vibrate(r >= 6 ? [80, 40, 80, 40, 80, 40, 300] : r >= 5 ? [60, 40, 60, 40, 180] : [40, 30, 80]);
+      const level = r >= 6 ? 4 : r >= 5 ? 3 : r >= 3 ? 2 : r >= 2 ? 1 : 0;
+      if (level) {
+        setShake(level);
+        at(level >= 4 ? 1200 : 700, () => setShake(0));
       }
     });
-    // EP count-up over ~800ms.
-    const steps = 24;
+    // EP count-up: about 1 s, longer for big tiers.
+    const steps = 30;
+    const tickMs = r >= 5 ? 50 : 36;
     for (let k = 1; k <= steps; k++) {
       const v = Math.round((result.ep * k) / steps);
-      at(t + 150 + k * 33, () => setStage((s) => ({ ...s, ep: v })));
+      at(t + 200 + k * tickMs, () => setStage((s) => ({ ...s, ep: v })));
     }
-    t += 150 + steps * 33 + 250;
+    t += 200 + steps * tickMs + 300;
     const sorted = [...result.badges].sort((a, b) => a.ep - b.ep);
     // Keep long badge lists snappy: about 3.4 s at most for all of them.
     const step = Math.min(340, Math.floor(3400 / Math.max(1, sorted.length)));
@@ -152,19 +177,35 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
     timers.current.forEach((id) => window.clearTimeout(id));
     timers.current = [];
     setStage(finalStage(result));
-    setShake(false);
+    setShake(0);
+    setDim(false);
   }
 
   const tierShown = view.tier && result;
 
   return (
+    <>
+      {/* Screen overlays live outside the shaking box: a transformed parent would trap them. */}
+      {burst > 0 && <Confetti key={burst} color={color} rank={rank} />}
+      {/* Spotlight: dim everything but the number while a very rare roll teases. */}
+      <div
+        aria-hidden
+        className={`pointer-events-none fixed inset-0 z-40 bg-black transition-opacity duration-700 ${dim ? "opacity-80" : "opacity-0"}`}
+      />
+      {flash > 0 && (
+        <div
+          key={flash}
+          aria-hidden
+          className="lk-flash pointer-events-none fixed inset-0 z-50"
+          style={{ background: `radial-gradient(circle at 50% 30%, #ffffff, ${color} 45%, transparent 75%)` }}
+        />
+      )}
+
     <div
-      className={`relative flex w-full flex-col items-center gap-6 ${shake ? "lk-shake" : ""}`}
+      className={`relative flex w-full flex-col items-center gap-6 ${SHAKE_CLASS[shake]}`}
       onClick={skip}
       style={{ ["--tier" as string]: color }}
     >
-      {burst > 0 && <Confetti key={burst} color={color} rank={rank} />}
-
       {/* Glow behind the number once the tier lands. */}
       <div
         aria-hidden
@@ -174,14 +215,15 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
         style={{ background: `radial-gradient(closest-side, ${color}55, transparent)` }}
       />
 
-      <div className="relative text-center">
+      <div className={`relative text-center ${dim ? "z-50" : ""}`}>
         <p className="text-sm uppercase tracking-widest text-zinc-500">
           {result ? `${result.attempt ? rollLabel(result.attempt) : "Your roll"} for ${result.roll_date}` : "Rolling…"}
         </p>
 
         {/* The reel */}
         <p
-          className="mt-2 flex items-end justify-center font-mono text-6xl font-bold tabular-nums sm:text-7xl"
+          ref={reelRef}
+          className={`mt-2 flex items-end justify-center font-mono text-6xl font-bold tabular-nums sm:text-7xl ${dim ? "lk-heartbeat" : ""}`}
           aria-live="polite"
           aria-label={view.done && result ? formatNumber(result.number) : undefined}
         >
@@ -300,5 +342,6 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
         result && <p className="text-xs text-zinc-600">Tap to skip</p>
       )}
     </div>
+    </>
   );
 }
