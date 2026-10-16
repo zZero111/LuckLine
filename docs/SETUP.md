@@ -73,6 +73,17 @@ transaction (a minute or two) rolls still work and are rescored by
 `rescore_all()`; the old site keeps working against the new schema until the
 new one deploys.
 
+### Version 1.1: player stats, more dramatic rolls, "What's new" pop-up
+
+```bash
+git pull && npm ci
+npx supabase db push        # applies 20261020120000_player_stats.sql
+```
+
+Then merge the PR. The "What's new" pop-up shows once per browser for each
+version. For a future release, bump `APP_VERSION` and add an entry at the top of
+`CHANGELOG` in `lib/version.ts`.
+
 ### Adding the badge expansion (96 → 369 badges)
 
 A migration (reroll price 400 EP, wheel bonus +200 EP) plus new badge data.

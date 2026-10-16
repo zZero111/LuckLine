@@ -684,6 +684,25 @@ async function main() {
     d.expect(!delAcct.error, `delete_my_account with an avatar on file: ${describe(delAcct)}`);
     d.done();
   }
+
+  // ---------------------------------------------------------------- ATK-19
+  {
+    const c = new Check("ATK-19", "player stats: sign-in needed, summary fields only (no email, wallet or history)");
+    const r = await anon.rpc("player_stats", { target_name: B.name });
+    c.expect(!!r.error, `anon player_stats: ${describe(r)}`);
+    c.expect(psql(`select has_function_privilege('anon', 'public.player_stats(text)', 'EXECUTE')`) === "f", "anon has EXECUTE on player_stats");
+    const ok = await A.client.rpc("player_stats", { target_name: B.name });
+    const keys = Object.keys((ok.data ?? {}) as object).sort().join(",");
+    const allowed = "avatar_path,badges_collected,badges_total,best,current_streak,days_played,display_name,joined,longest_streak,rank_all_time,rarest_badge,total_ep,total_rolls,wheel_spins";
+    c.expect(!ok.error && keys === allowed, `A reads B's stats: keys=${keys} ${ok.error?.message ?? ""}`);
+    const blob = JSON.stringify(ok.data ?? {});
+    c.expect(!/@|balance|spent|earned|user_id/.test(blob), `stats leak private fields: ${blob.slice(0, 200)}`);
+    for (const name of ["no_such_player_xyz", "' or 1=1 --", "%"]) {
+      const x = await A.client.rpc("player_stats", { target_name: name });
+      c.expect(!!x.error, `player_stats(${JSON.stringify(name)}) should fail: ${describe(x)}`);
+    }
+    c.done();
+  }
 }
 
 main()
