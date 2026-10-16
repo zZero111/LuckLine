@@ -81,7 +81,7 @@ Front-end only: no migration and no data load, so no `db push` and no psql.
 git pull && npm ci
 ```
 
-Then merge the PR. The 1.1.1 "What's new" pop-up shows once to every player.
+Then merge the PR. The 1.1.2 "What's new" pop-up shows once to every player.
 
 ### Version 1.1.1: duplicate badges replaced, 67 badges, spinning die, polish
 
