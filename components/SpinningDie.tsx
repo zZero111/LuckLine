@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Group, Object3D } from "three";
+import { BASE_PATH } from "@/lib/base-path";
 
-interface Props {
+export interface DieProps {
   size?: number;
   /** Idle tumble speed in degrees per second (on the fastest axis). */
   speed?: number;
@@ -36,8 +38,8 @@ const PIPS: Record<number, number[]> = {
 // Slightly different shading per face so the cube reads as solid.
 const SHADE = [1, 0.62, 0.86, 0.74, 1.12, 0.55];
 
-/** A real 3D die tumbling on all three axes. Hover speeds it up; a kick makes it whirl. */
-export function SpinningDie({ size = 30, speed = 45, fast = false, kick = 0, className = "" }: Props) {
+/** CSS-only 3D cube, used if WebGL or the model is unavailable. */
+function CssDie({ size = 30, speed = 45, fast = false, kick = 0, className = "" }: DieProps) {
   const cube = useRef<HTMLDivElement>(null);
   const motion = useRef({ x: -24, y: 38, z: 0, impulse: 0, boost: 0, fast });
 
@@ -120,4 +122,135 @@ export function SpinningDie({ size = 30, speed = 45, fast = false, kick = 0, cla
       </div>
     </span>
   );
+}
+
+const MODEL_URL = `${BASE_PATH}/models/dice.glb`;
+const PURPLE = "#7c3aed";
+
+/** One shared download + parse of the model, cloned for each logo on the page. */
+let modelPromise: Promise<Object3D> | null = null;
+function loadModel(): Promise<Object3D> {
+  modelPromise ??= (async () => {
+    const [THREE, { GLTFLoader }] = await Promise.all([import("three"), import("three/examples/jsm/loaders/GLTFLoader.js")]);
+    const gltf = await new GLTFLoader().loadAsync(MODEL_URL);
+    const root = gltf.scene;
+    // The model is red with grey pips: recolour to purple with white pips and a softer sheen.
+    root.traverse((o) => {
+      const mesh = o as import("three").Mesh;
+      if (!mesh.isMesh) return;
+      const old = mesh.material as import("three").MeshStandardMaterial;
+      const body = old.color.r > 0.3 && old.color.g < 0.2;
+      mesh.material = new THREE.MeshStandardMaterial({
+        color: body ? PURPLE : "#f5f3ff",
+        roughness: body ? 0.35 : 0.5,
+        metalness: body ? 0.15 : 0,
+        side: THREE.DoubleSide,
+      });
+      old.dispose();
+    });
+    // Centre it and scale so the whole die fits a sphere of radius 1 (it never clips while spinning).
+    const box = new THREE.Box3().setFromObject(root);
+    const sphere = box.getBoundingSphere(new THREE.Sphere());
+    const holder = new THREE.Group();
+    root.position.sub(sphere.center);
+    holder.add(root);
+    holder.scale.setScalar(1 / sphere.radius);
+    return holder;
+  })();
+  modelPromise.catch(() => (modelPromise = null));
+  return modelPromise;
+}
+
+function GlDie({ size, speed, fast, kick, className, onFail }: DieProps & { size: number; speed: number; onFail: () => void }) {
+  const host = useRef<HTMLSpanElement>(null);
+  const motion = useRef({ impulse: 0, boost: 0, fast: !!fast });
+
+  useEffect(() => {
+    motion.current.fast = !!fast;
+  }, [fast]);
+  useEffect(() => {
+    if ((kick ?? 0) > 0) motion.current.impulse = 1400;
+  }, [kick]);
+
+  useEffect(() => {
+    const el = host.current;
+    if (!el) return;
+    let dead = false;
+    let raf = 0;
+    let cleanup = () => {};
+    (async () => {
+      try {
+        const THREE = await import("three");
+        const model = await loadModel();
+        if (dead) return;
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: "low-power" });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setSize(size, size);
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        el.appendChild(renderer.domElement);
+        renderer.domElement.style.display = "block";
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
+        camera.position.z = 1 / Math.sin((30 / 2) * (Math.PI / 180)) + 0.05; // sphere of radius 1 just fits
+        scene.add(new THREE.HemisphereLight("#ede9fe", "#2e1065", 1.5));
+        const key = new THREE.DirectionalLight("#ffffff", 2.4);
+        key.position.set(2, 3, 4);
+        scene.add(key);
+        const rim = new THREE.DirectionalLight("#a78bfa", 1.2);
+        rim.position.set(-3, -1, -2);
+        scene.add(rim);
+
+        const spinner: Group = new THREE.Group();
+        const instance = model.clone(true);
+        spinner.add(instance);
+        spinner.rotation.set(0.5, 0.7, 0);
+        scene.add(spinner);
+
+        const render = () => renderer.render(scene, camera);
+        render();
+        if (!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+          let last = performance.now();
+          const loop = (now: number) => {
+            const dt = Math.min(0.05, (now - last) / 1000);
+            last = now;
+            const m = motion.current;
+            m.impulse *= Math.pow(0.2, dt);
+            const target = (m.fast ? 6 : 1) + m.impulse / Math.max(1, speed);
+            m.boost += (target - m.boost) * Math.min(1, dt * 5);
+            const k = (Math.PI / 180) * speed * m.boost * dt;
+            // Three different rates on three axes: a proper tumble.
+            spinner.rotation.x += k * 0.9;
+            spinner.rotation.y += k * 1.15;
+            spinner.rotation.z += k * 0.5;
+            render();
+            raf = requestAnimationFrame(loop);
+          };
+          raf = requestAnimationFrame(loop);
+        }
+        cleanup = () => {
+          cancelAnimationFrame(raf);
+          renderer.dispose();
+          renderer.domElement.remove();
+        };
+        if (dead) cleanup();
+      } catch {
+        if (!dead) onFail();
+      }
+    })();
+    return () => {
+      dead = true;
+      cleanup();
+    };
+  }, [size, speed, onFail]);
+
+  return <span ref={host} aria-hidden className={`inline-block shrink-0 ${className ?? ""}`} style={{ width: size, height: size }} />;
+}
+
+/** The 3D dice model, tumbling on all axes. Falls back to a CSS cube if WebGL is unavailable. */
+export function SpinningDie({ size = 30, speed = 45, ...rest }: DieProps) {
+  const [failed, setFailed] = useState(false);
+  const onFail = useCallback(() => setFailed(true), []);
+  if (failed) return <CssDie size={size} speed={speed} {...rest} />;
+  return <GlDie size={size} speed={speed} {...rest} onFail={onFail} />;
 }
