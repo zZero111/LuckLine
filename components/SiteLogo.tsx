@@ -19,9 +19,9 @@ export function SiteLogo() {
         sfx.rattle();
         setKick((k) => k + 1);
       }}
-      className="flex items-center gap-2 text-xl font-extrabold tracking-tight"
+      className="flex items-center gap-3 text-xl font-extrabold tracking-tight"
     >
-      <SpinningDie size={30} speed={40} fast={hover} kick={kick} />
+      <SpinningDie size={42} speed={40} fast={hover} kick={kick} />
       <span>
         <span className="text-violet-400">Luck</span>line
       </span>
@@ -35,7 +35,7 @@ export function HeroLogo() {
   const [kick, setKick] = useState(0);
   return (
     <h1
-      className="flex cursor-pointer select-none items-center justify-center gap-3 text-4xl font-extrabold tracking-tight sm:text-5xl"
+      className="flex cursor-pointer select-none items-center justify-center gap-5 text-4xl font-extrabold tracking-tight sm:text-5xl"
       onPointerEnter={() => setHover(true)}
       onPointerLeave={() => setHover(false)}
       onClick={() => {
@@ -44,7 +44,7 @@ export function HeroLogo() {
       }}
       title="Give it a spin"
     >
-      <SpinningDie size={56} speed={55} fast={hover} kick={kick} />
+      <SpinningDie size={88} speed={55} fast={hover} kick={kick} />
       <span>
         <span className="text-violet-400">Luck</span>line
       </span>
