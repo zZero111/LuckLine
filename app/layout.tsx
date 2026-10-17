@@ -4,6 +4,7 @@ import { SiteLogo } from "@/components/SiteLogo";
 import { SoundToggle } from "@/components/SoundToggle";
 import { UiFx } from "@/components/UiFx";
 import { UserArea } from "@/components/UserArea";
+import { PasswordPrompt } from "@/components/PasswordPrompt";
 import { WhatsNew } from "@/components/WhatsNew";
 import { AuthProvider } from "@/lib/supabase/auth-context";
 import "./globals.css";
@@ -57,6 +58,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 py-10">{children}</main>
           <footer className="mx-auto w-full max-w-4xl px-4 pb-6 text-center">
             <WhatsNew />
+            <PasswordPrompt />
             <p className="mt-1 text-[11px] text-zinc-700">
               Dice model by{" "}
               <a href="https://sketchfab.com/3d-models/dice-d796ac8f56db4dc78ed18be534939225" target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:text-zinc-400 hover:underline">
