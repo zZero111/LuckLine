@@ -431,7 +431,7 @@ function PasswordForm() {
       return;
     }
     setPending(true);
-    const { error } = await createClient().auth.updateUser({ password });
+    const { error } = await createClient().auth.updateUser({ password, data: { has_password: true } });
     setPending(false);
     if (error) {
       setState({ message: "Could not save that password. Try a longer or less common one, or sign in again first." });

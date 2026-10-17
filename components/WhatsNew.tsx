@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { sfx } from "@/lib/game/sfx";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { APP_VERSION, CHANGELOG } from "@/lib/version";
+import { WHATS_NEW_CLOSED } from "./PasswordPrompt";
 
 const KEY = "luckline:seen-version";
 
@@ -46,6 +47,7 @@ export function WhatsNew() {
     markSeen();
     setOpen(false);
     sfx.close();
+    window.dispatchEvent(new Event(WHATS_NEW_CLOSED));
   }
 
   function show() {
