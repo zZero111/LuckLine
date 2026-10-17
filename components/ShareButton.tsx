@@ -14,7 +14,7 @@ import { formatNumber, wheelTag, type RollResultData } from "./types";
  *   Rare · 37 EP 🟦
  *   🟩🟦🟪
  *   Top 4.21% of all possible rolls · 🔥3
- *   https://example.github.io/RNGdle-2/
+ *   https://example.github.io/LuckLine/
  */
 export function shareText(result: RollResultData, url: string, streak?: number) {
   const squares = [...result.badges]
