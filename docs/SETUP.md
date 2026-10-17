@@ -73,6 +73,27 @@ transaction (a minute or two) rolls still work and are rescored by
 `rescore_all()`; the old site keeps working against the new schema until the
 new one deploys.
 
+### Password sign-in
+
+Front-end only: no migration, no data load. Players still sign up with the email
+link; after that they can set a password on the Account page and sign in with
+email + password from then on. "Forgot your password?" emails a reset link.
+
+```bash
+git pull && npm ci
+```
+
+Then merge the PR, and in the Supabase dashboard:
+
+1. **Auth → Email Templates → Reset Password:** replace the link with
+   `{{ .SiteURL }}/auth/confirm/?token_hash={{ .TokenHash }}&type=recovery`
+   (see `supabase/templates/recovery.html`). Without this the reset email links
+   to the wrong page. The local `config.toml` setting is not pushed to the hosted project.
+2. **Auth → Sign In / Providers → Email:** keep **Email provider** on and set
+   **Minimum password length** to `8`. Leave **Confirm email** on.
+3. **Auth → Rate Limits:** keep the sign-in limit low (for example 30 per 5 min per IP).
+   This is what slows down password guessing, so check it is not raised.
+
 ### Version 1.1.2: 3D die, full-screen roll, badge auras, podium frames
 
 Front-end only: no migration and no data load, so no `db push` and no psql.
