@@ -126,7 +126,7 @@ until you connect a sender:
       set enabled = true,
           sender_email = 'you@gmail.com',      -- the address you verified in step 2
           sender_name = 'Luckline',
-          site_url = 'https://zzero111.github.io/RNGdle-2';
+          site_url = 'https://zzero111.github.io/LuckLine';
    ```
 
 5. **Send yourself a test:** `select private.send_daily_reminders('you@gmail.com');`
@@ -232,14 +232,14 @@ new migration that redefines those two functions; the UI reads them through
 | Auth → SMTP | Configure custom SMTP. The built-in sender is rate-limited and for testing only. |
 | Auth → Attack Protection | Enable CAPTCHA (hCaptcha or Turnstile). The app does not send a captcha token yet, so wiring it into the login form is a follow-up. |
 | Auth → Rate Limits | Lower the email-sending and OTP verification limits (for example 30 emails/hour, 30 verifications per 5 min per IP). |
-| Auth → URL Configuration | **Site URL** = `https://zzero111.github.io/RNGdle-2` (no trailing slash). **Redirect URLs**: exactly `https://zzero111.github.io/RNGdle-2/auth/confirm/` and nothing else. No wildcards. Local addresses belong in `supabase/config.toml` for the local stack only, not on the hosted project. |
+| Auth → URL Configuration | **Site URL** = `https://zzero111.github.io/LuckLine` (no trailing slash). **Redirect URLs**: exactly `https://zzero111.github.io/LuckLine/auth/confirm/` and nothing else. No wildcards. Local addresses belong in `supabase/config.toml` for the local stack only, not on the hosted project. |
 | Organization → Team | At least **two Owners** with MFA enabled. |
 | Database → Backups | Confirm daily backups are on; consider PITR. |
 
 Build settings: the GitHub Pages workflow reads `NEXT_PUBLIC_SUPABASE_URL` and
 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from **GitHub → Settings → Secrets and
 variables → Actions → Variables** (they are public values, so Variables is fine).
-The workflow itself sets `NEXT_PUBLIC_BASE_PATH=/RNGdle-2`. Never add a secret key
+The workflow itself sets `NEXT_PUBLIC_BASE_PATH=/LuckLine`. Never add a secret key
 or the database password there.
 
 ## 4. GitHub
@@ -249,7 +249,7 @@ or the database password there.
 - Enable **Dependabot alerts** and **Dependabot security updates**.
 - Settings → Pages → **Build and deployment → Source: GitHub Actions**.
   `.github/workflows/deploy-pages.yml` builds the static site and deploys it to
-  `https://zzero111.github.io/RNGdle-2/` on every push to the default branch.
+  `https://zzero111.github.io/LuckLine/` on every push to the default branch.
   Pull requests build and test only. Free GitHub plans need a public repo for Pages.
 
 ## 5. Static hosting: what changed and what is lost
