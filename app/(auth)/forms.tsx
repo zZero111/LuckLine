@@ -29,35 +29,106 @@ function formString(form: HTMLFormElement, field: string) {
   return typeof raw === "string" ? raw.trim() : "";
 }
 
+const MIN_PASSWORD = 8;
+const MAX_PASSWORD = 72; // bcrypt ignores anything longer
+
+type LoginMode = "password" | "link" | "forgot";
+
+/** Sends a signed-in player to the game, or to name picking if they have no profile yet. */
+async function goAfterSignIn(router: ReturnType<typeof useRouter>, userId: string) {
+  const { data: profile } = await createClient().from("profiles").select("id").eq("id", userId).maybeSingle();
+  router.replace(profile ? "/" : "/welcome");
+}
+
 export function LoginForm() {
+  const router = useRouter();
+  const [mode, setMode] = useState<LoginMode>("password");
   const [state, setState] = useState<FormState>(initial);
   const [pending, setPending] = useState(false);
 
+  function switchMode(next: LoginMode) {
+    setMode(next);
+    setState(initial);
+  }
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const email = formString(event.currentTarget, "email");
+    const form = event.currentTarget;
+    const email = formString(form, "email");
     if (email.length > 254 || !EMAIL_RE.test(email)) {
       setState({ message: "Enter a valid email address." });
       return;
     }
+
+    if (mode === "password") {
+      const password = new FormData(form).get("password");
+      if (typeof password !== "string" || password.length === 0 || password.length > MAX_PASSWORD) {
+        setState({ message: "Enter your password." });
+        return;
+      }
+      setPending(true);
+      try {
+        const { data, error } = await createClient().auth.signInWithPassword({ email, password });
+        if (!error && data.user) {
+          await goAfterSignIn(router, data.user.id);
+          return;
+        }
+      } catch {
+        // Falls through to the same message as a wrong password.
+      }
+      setPending(false);
+      // One message for every failure, so it never reveals which emails have accounts.
+      setState({ message: "Wrong email or password. First time, or no password set yet? Use the email link." });
+      return;
+    }
+
     setPending(true);
     try {
-      await createClient().auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}${BASE_PATH}/auth/confirm/`,
-          shouldCreateUser: true,
-        },
-      });
+      if (mode === "link") {
+        await createClient().auth.signInWithOtp({
+          email,
+          options: {
+            emailRedirectTo: `${window.location.origin}${BASE_PATH}/auth/confirm/`,
+            shouldCreateUser: true,
+          },
+        });
+      } else {
+        await createClient().auth.resetPasswordForEmail(email);
+      }
     } catch {
       // Deliberately ignored: the response never reveals whether sending worked.
     }
     setPending(false);
-    setState({ message: NEUTRAL_LOGIN_MESSAGE, ok: true });
+    setState({
+      message: mode === "link" ? NEUTRAL_LOGIN_MESSAGE : "If that address has an account, a reset link is on its way.",
+      ok: true,
+    });
   }
+
+  const tab = (m: LoginMode, label: string) => (
+    <button
+      type="button"
+      onClick={() => switchMode(m)}
+      aria-pressed={mode === m}
+      className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium ${mode === m ? "bg-violet-600 text-white" : "text-zinc-400 hover:text-white"}`}
+    >
+      {label}
+    </button>
+  );
 
   return (
     <form onSubmit={onSubmit} className="space-y-3">
+      {mode !== "forgot" && (
+        <div className="flex gap-1 rounded-lg border border-zinc-800 bg-zinc-950 p-1">
+          {tab("password", "Password")}
+          {tab("link", "Email link")}
+        </div>
+      )}
+      <p className="text-sm text-zinc-400">
+        {mode === "password" && "Sign in with your email and password."}
+        {mode === "link" && "We'll email you a one-time sign-in link. Use this the first time, then set a password in your account."}
+        {mode === "forgot" && "Enter your email and we'll send you a link to set a new password."}
+      </p>
       <label htmlFor="email" className="block text-sm text-zinc-300">
         Email
       </label>
@@ -71,13 +142,47 @@ export function LoginForm() {
         placeholder="you@example.com"
         className={inputClass}
       />
+      {mode === "password" && (
+        <>
+          <label htmlFor="password" className="block text-sm text-zinc-300">
+            Password
+          </label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            required
+            maxLength={MAX_PASSWORD}
+            autoComplete="current-password"
+            className={inputClass}
+          />
+        </>
+      )}
       <button type="submit" disabled={pending} className={buttonClass}>
-        {pending ? "Sending…" : "Email me a sign-in link"}
+        {pending
+          ? mode === "password"
+            ? "Signing in…"
+            : "Sending…"
+          : mode === "password"
+            ? "Sign in"
+            : mode === "link"
+              ? "Email me a sign-in link"
+              : "Email me a reset link"}
       </button>
       {state.message && (
         <p role="status" className={state.ok ? "text-sm text-violet-300" : "text-sm text-red-400"}>
           {state.message}
         </p>
+      )}
+      {mode === "password" && (
+        <button type="button" onClick={() => switchMode("forgot")} className="text-sm text-zinc-400 underline underline-offset-4 hover:text-white">
+          Forgot your password?
+        </button>
+      )}
+      {mode === "forgot" && (
+        <button type="button" onClick={() => switchMode("password")} className="text-sm text-zinc-400 underline underline-offset-4 hover:text-white">
+          Back to sign in
+        </button>
       )}
     </form>
   );
@@ -104,17 +209,19 @@ export function ConfirmPanel() {
   const tokenHash = params.get("token_hash") ?? "";
   const type = params.get("type") ?? "email";
 
-  if (!TOKEN_HASH_RE.test(tokenHash) || type !== "email") return <ExpiredLink />;
+  if (!TOKEN_HASH_RE.test(tokenHash) || (type !== "email" && type !== "recovery")) return <ExpiredLink />;
 
   return (
     <>
-      <p className="mb-4 text-sm text-zinc-400">Press the button to sign in on this device.</p>
-      <ConfirmForm tokenHash={tokenHash} />
+      <p className="mb-4 text-sm text-zinc-400">
+        {type === "recovery" ? "Press the button, then choose a new password." : "Press the button to sign in on this device."}
+      </p>
+      <ConfirmForm tokenHash={tokenHash} type={type} />
     </>
   );
 }
 
-function ConfirmForm({ tokenHash }: { tokenHash: string }) {
+function ConfirmForm({ tokenHash, type }: { tokenHash: string; type: "email" | "recovery" }) {
   const router = useRouter();
   const [failed, setFailed] = useState(false);
   const [pending, setPending] = useState(false);
@@ -124,18 +231,17 @@ function ConfirmForm({ tokenHash }: { tokenHash: string }) {
     setPending(true);
     try {
       const supabase = createClient();
-      const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "email" });
+      const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
       if (error || !data.user) {
         setFailed(true);
         setPending(false);
         return;
       }
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("id", data.user.id)
-        .maybeSingle();
-      router.replace(profile ? "/" : "/welcome");
+      if (type === "recovery") {
+        router.replace("/account#password");
+        return;
+      }
+      await goAfterSignIn(router, data.user.id);
     } catch {
       setFailed(true);
       setPending(false);
@@ -147,7 +253,7 @@ function ConfirmForm({ tokenHash }: { tokenHash: string }) {
   return (
     <form onSubmit={onSubmit} className="space-y-3">
       <button type="submit" disabled={pending} className={buttonClass}>
-        {pending ? "Signing in…" : "Sign in"}
+        {pending ? "Signing in…" : type === "recovery" ? "Continue" : "Sign in"}
       </button>
     </form>
   );
@@ -268,6 +374,11 @@ export function AccountPanel() {
         <ReminderToggle />
       </section>
 
+      <section id="password">
+        <h2 className="mb-2 text-sm font-semibold text-zinc-300">Password</h2>
+        <PasswordForm />
+      </section>
+
       <dl className="space-y-2 text-sm">
         <div>
           <dt className="text-zinc-400">Email</dt>
@@ -298,6 +409,58 @@ export function AccountPanel() {
         <DeleteAccountForm />
       </section>
     </div>
+  );
+}
+
+function PasswordForm() {
+  const [state, setState] = useState<FormState>(initial);
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const password = data.get("password");
+    const again = data.get("again");
+    if (typeof password !== "string" || password.length < MIN_PASSWORD || password.length > MAX_PASSWORD) {
+      setState({ message: `Use ${MIN_PASSWORD}-${MAX_PASSWORD} characters.` });
+      return;
+    }
+    if (password !== again) {
+      setState({ message: "The two passwords don't match." });
+      return;
+    }
+    setPending(true);
+    const { error } = await createClient().auth.updateUser({ password });
+    setPending(false);
+    if (error) {
+      setState({ message: "Could not save that password. Try a longer or less common one, or sign in again first." });
+      return;
+    }
+    form.reset();
+    setState({ message: "Password saved. Next time you can sign in with your email and password.", ok: true });
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-3">
+      <p className="text-xs text-zinc-500">Set or change the password you sign in with. {MIN_PASSWORD} characters or more.</p>
+      <label htmlFor="new-password" className="sr-only">
+        New password
+      </label>
+      <input id="new-password" name="password" type="password" required minLength={MIN_PASSWORD} maxLength={MAX_PASSWORD} autoComplete="new-password" placeholder="New password" className={inputClass} />
+      <label htmlFor="new-password-again" className="sr-only">
+        Repeat new password
+      </label>
+      <input id="new-password-again" name="again" type="password" required minLength={MIN_PASSWORD} maxLength={MAX_PASSWORD} autoComplete="new-password" placeholder="Repeat new password" className={inputClass} />
+      <button type="submit" disabled={pending} className={buttonClass}>
+        {pending ? "Saving…" : "Save password"}
+      </button>
+      {state.message && (
+        <p role="status" className={state.ok ? "text-sm text-violet-300" : "text-sm text-red-400"}>
+          {state.message}
+        </p>
+      )}
+    </form>
   );
 }
 
