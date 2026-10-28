@@ -446,7 +446,7 @@ async function main() {
     c.expect(!mine.error && (mine.data ?? []).every((w) => w.user_id === A.id), `A reads wallets: ${describe(mine)}`);
     const theirs = await A.client.from("ep_wallets").select("*").eq("user_id", B.id);
     c.expect(deniedRead(theirs), `A reads B's wallet: ${describe(theirs)}`);
-    for (const fn of ["record_roll(uuid,date,smallint)", "rescore_all()", "reroll_price()", "max_rerolls()"]) {
+    for (const fn of ["record_roll(uuid,date,smallint,boolean)", "rescore_all()", "reroll_price()", "max_rerolls()"]) {
       const p = psql(`select has_function_privilege('authenticated', 'private.${fn}', 'EXECUTE')`);
       c.expect(p === "f", `authenticated has EXECUTE on private.${fn}`);
     }
@@ -482,6 +482,8 @@ async function main() {
     await H.client.rpc("roll_today");
     psql(`update public.ep_wallets set earned_ep = earned_ep + 1000000 where user_id = ${sqlStr(H.id)}`);
     const w0 = psql(`select earned_ep||','||spent_ep from public.ep_wallets where user_id = ${sqlStr(H.id)}`).split(",").map(Number);
+    const credits = () => Number(psql(`select coalesce(sum(amount), 0) from public.ep_credits where user_id = ${sqlStr(H.id)}`));
+    const credits0 = credits();
     const res = await Promise.all(Array.from({ length: 20 }, () => H.client.rpc("reroll_today")));
     const ok = res.filter((r) => !r.error);
     c.expect(ok.length === 3, `${ok.length} of 20 rerolls succeeded (errors: ${[...new Set(res.filter((r) => r.error).map((r) => r.error!.message))].join("; ")})`);
@@ -491,7 +493,8 @@ async function main() {
     const w1 = psql(`select earned_ep||','||spent_ep from public.ep_wallets where user_id = ${sqlStr(H.id)}`).split(",").map(Number);
     const price = Number(psql("select private.reroll_price()"));
     c.expect(w1[1] - w0[1] === 3 * price, `spent_ep grew by ${w1[1] - w0[1]}, expected ${3 * price}`);
-    c.expect(w1[0] - w0[0] === gained, `earned_ep grew by ${w1[0] - w0[0]}, rerolls earned ${gained}`);
+    // Rerolls can also earn community-number bonuses, which are recorded as EP credits.
+    c.expect(w1[0] - w0[0] === gained + (credits() - credits0), `earned_ep grew by ${w1[0] - w0[0]}, rerolls earned ${gained} + credits ${credits() - credits0}`);
     const day = psql(`select t.total_ep = (select max(ep) from public.rolls where user_id = ${sqlStr(H.id)}) and t.roll_count = 1 from public.leaderboard_totals t where user_id = ${sqlStr(H.id)}`);
     c.expect(day === "t", "leaderboard total is not the day's best roll / roll_count != 1");
     const lb = await H.client.from("leaderboard_today").select("display_name").eq("display_name", H.name);
