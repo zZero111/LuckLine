@@ -83,7 +83,7 @@ npx supabase db push        # applies 20261101120000_credits_and_cosmetics.sql a
 ```
 
 Then merge the PR. Nothing else to set up. Existing wallets, rolls and the
-leaderboard are untouched.
+leaderboard are untouched. The 1.1.3 "What's new" pop-up shows once to every player.
 
 - **Game constants** live in the database (change them with a new migration):
   shield price 600 EP and max 3 (`private.shield_price()`, `private.max_shields()`),

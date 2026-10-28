@@ -1,6 +1,6 @@
 // Bump APP_VERSION and add an entry to CHANGELOG to show the "What's new"
 // pop-up again to every player on their next visit.
-export const APP_VERSION = "1.1.2";
+export const APP_VERSION = "1.1.3";
 
 export interface ChangelogEntry {
   version: string;
@@ -9,6 +9,25 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "1.1.3",
+    title: "Shop, streaks, events and a whole lot more",
+    items: [
+      { emoji: "🛍️", text: "New Shop tab: spend EP on leaderboard auras, picture frames, roll colours and name styles. They never change your roll or your score. Your EP now shows at the top of every page." },
+      { emoji: "🛡️", text: "Streak shields: buy one for 600 EP (hold up to 3) and it automatically covers days you miss so your streak survives. Streak milestones at 7, 14, 30 and 100 days give EP, a shield, a gold name glow and a Centurion frame." },
+      { emoji: "📊", text: "Weekly recap on your Profile: your week's EP, your seven rolls, best roll, rarest badge, streak and rank. Share it or save it as an image." },
+      { emoji: "📖", text: "A brand-new Badge Album with a progress ring, search and filters. Badges you haven't found stay hidden until you're close, and there are rewards at 10%, 25%, 50%, 75% and 100%." },
+      { emoji: "👑", text: "Family fusion: collect every badge in a family and fuse it into a Master badge for a big EP reward and a permanent prism name." },
+      { emoji: "🔥", text: "Limited events: Beast Day on every Friday the 13th, plus 11/11, 7/7, Pi Day, 6/9 and New Year. Boosted badges pay triple, and rolling them on 3 event days earns a free cosmetic." },
+      { emoji: "🌍", text: "Community number: one shared number a day. Roll, then see how many digits you match. Matches pay from +50 EP up to +25,000 EP for an exact hit." },
+      { emoji: "🎯", text: "Badge Hunt: a wanted badge every day. Catch it for a bonus of 10× its EP, and win 7 hunts for a free reroll and the Hunter name glow." },
+      { emoji: "🔍", text: "Every badge on your result now shows which digits of your number earned it." },
+      { emoji: "🎰", text: "No more spoilers: the colours during a roll now cycle at random, and everything before the tier lands is the same for every number." },
+      { emoji: "🔑", text: "Sign in with a password. Set one on your Account page, then skip the email link. Forgot it? Use \"Forgot your password?\" on the sign-in page." },
+      { emoji: "🎡", text: "The Lucky Wheel sounds better: clacking pegs that slow down, coin showers for wins and a sad trombone for lose half." },
+      { emoji: "🎲", text: "The logo is now a real 3D dice model, bigger and tumbling on every axis." },
+    ],
+  },
   {
     version: "1.1.2",
     title: "A real die, glowing badges and a bigger roll",
