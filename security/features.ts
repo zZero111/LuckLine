@@ -297,6 +297,9 @@ async function main() {
   {
     const c = new Check("FEAT-08", "Badge Hunt: bonus once a day, 7 wins give a free reroll and Hunter");
     const p = await newPlayer("hunt");
+    // Today's wanted badge is one nobody realistically rolls, so the player's own roll can't win the hunt by luck.
+    psql(`delete from public.hunt_days where day = ${q(T)}`);
+    psql(`insert into public.hunt_days (day, badge_id, counted, bonus_ep) values (${q(T)}, ${badgeId("the-million")}, 1, 10)`);
     await p.client.rpc("roll_today");
     const wanted = badgeId("double-take");
     psql(`delete from public.hunt_days where day = ${q(T)}`);
@@ -443,7 +446,8 @@ async function main() {
     psql(`update public.rolls set event_bonus_ep = 123, ep = ep + 123 where user_id = ${q(p.id)}`);
     const spentBefore = psql(`select spent_ep from public.ep_wallets where user_id = ${q(p.id)}`);
     psql("select private.rescore_all()");
-    const expected = Number(psql(`select coalesce(sum(ep), 0) from public.rolls where user_id = ${q(p.id)}`)) + 500;
+    // Rolls plus every credit (the player's own roll may also have earned a community or hunt bonus).
+    const expected = Number(psql(`select coalesce(sum(ep), 0) from public.rolls where user_id = ${q(p.id)}`)) + creditSum(p.id, "album") + creditSum(p.id, "community") + creditSum(p.id, "hunt") + creditSum(p.id, "milestone") + creditSum(p.id, "fusion");
     c.expect(Number(psql(`select earned_ep from public.ep_wallets where user_id = ${q(p.id)}`)) === expected, "wallet = rolls + credits after a rescore");
     c.expect(psql(`select event_bonus_ep from public.rolls where user_id = ${q(p.id)}`) === "123", "the event bonus survives");
     c.expect(psql(`select spent_ep from public.ep_wallets where user_id = ${q(p.id)}`) === spentBefore, "spent EP is untouched");
