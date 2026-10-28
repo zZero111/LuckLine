@@ -50,6 +50,35 @@ Result after the fix round: **no open Critical or High findings.** The attack su
 | SCAN-08 | — | No `sb_secret_` key, JWT, DB password or private key in git history or `.next` output (string literals in supabase-js only); only `.env.example` (empty) is tracked | Pass |
 | SCAN-09 | — | gitleaks could not run (Docker Hub rate limit); a regex sweep over `git log -p --all` was used instead | Re-run gitleaks in GitHub secret scanning |
 
+## Engagement update (streaks, shop, events, community number, hunt, fusion, recap)
+
+Run with `npm run test:features` against a local stack (`security/features.ts`,
+14 checks, same style as the attack suite). Everything that moves EP or hands
+out a reward runs in the database: clients have no write grants on any new
+table, and every new function takes the player from `auth.uid()`.
+
+| ID | Severity | What was tested | Status |
+|---|---|---|---|
+| FEAT-01 | — | A roll returns rewards, streak and the new event/bonus fields, consistently stored | Pass |
+| FEAT-02 | — | Streak shields cover missed days only when they all fit, never when auto-use is off, and are spent once | Pass |
+| FEAT-03 | — | Streak milestones pay exactly once, including after rerolls | Pass |
+| FEAT-04 | — | Buying shields: price, cap of 3, not enough EP, signed-out refused | Pass |
+| FEAT-05 | — | Shop: buy and equip only what you own or can afford, earn-only items can't be bought, `profiles.aura` and `player_cosmetics` can't be written directly, other players' items are unreadable | Pass |
+| FEAT-06 | — | Events: bonus is exactly (multiplier − 1) × boosted EP, hits count once per day, the reward unlocks on the third event day only | Pass |
+| FEAT-07 | — | Community number: hidden until you have rolled, ladder bonus paid once and only the improvement later, tables unreadable | Pass |
+| FEAT-08 | — | Badge Hunt: one bonus per day, seven wins give a free reroll and the Hunter name, `hunt_days` unreadable | Pass |
+| FEAT-09 | — | Free reroll tokens cost nothing, are used once, and the paid reroll limit still holds | Pass |
+| FEAT-10 | — | Fusion needs a complete family of 3+, pays once, rejects unknown families | Pass |
+| FEAT-11 | — | Weekly recap: only your own data (no other player's name), bad week numbers rejected | Pass |
+| FEAT-12 | — | For all 19 new tables: signed-out reads nothing, signed-in insert/update/delete denied, no cross-player reads; all new RPCs refuse signed-out callers; `private.*` helpers aren't callable | Pass |
+| FEAT-13 | — | `rescore_all()` keeps EP credits and event bonuses and never touches spent EP; the same credit can't be paid twice | Pass |
+| FEAT-14 | — | Album rewards pay at their percentage, once | Pass |
+
+Design notes: rewards are idempotent (`ep_credits` is unique per player, kind
+and ref), wallet changes lock the wallet row (`for update`) so a purchase can't
+race a reroll or spin, and the community number stays hidden until you have
+rolled.
+
 ## Follow-ups (Medium / Low)
 
 1. **SCAN-07**: the static export cannot use per-request nonces. Drop `'unsafe-inline'` from `script-src` only if Next can emit hash-based inline scripts; otherwise accept it.

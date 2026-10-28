@@ -16,18 +16,33 @@ export function friendlyError(message: string): { text: string; href?: string; l
   return { text: "Something went wrong while rolling. Please try again." };
 }
 
-/** The big daily Roll button. */
-export function RollButton({ onRoll, streakBefore = 0 }: { onRoll: () => void; streakBefore?: number }) {
+/** The big daily Roll button. `label` and `color` restyle it for events; `note` adds a line under it. */
+export function RollButton({
+  onRoll,
+  streakBefore = 0,
+  label = "ROLL",
+  color,
+  note,
+}: {
+  onRoll: () => void;
+  streakBefore?: number;
+  label?: string;
+  color?: string;
+  note?: string | null;
+}) {
   return (
-    <div className="flex flex-col items-center gap-6">
+    <div className="flex w-full max-w-md flex-col items-center gap-3">
       <button
         type="button"
         onClick={onRoll}
         data-sfx="rattle"
-        className="lk-pulse rounded-2xl bg-violet-600 px-16 py-7 text-4xl font-black tracking-wide text-white transition hover:scale-105 hover:bg-violet-500 active:scale-95"
+        className={`lk-pulse flex w-full items-center justify-center gap-3 rounded-2xl px-8 py-6 text-3xl font-black uppercase tracking-wider text-white transition hover:scale-[1.02] active:scale-95 ${color ? "" : "bg-violet-600 hover:bg-violet-500"}`}
+        style={color ? { background: `linear-gradient(180deg, ${color}, color-mix(in srgb, ${color} 55%, #7f1d1d))`, boxShadow: `0 0 36px ${color}55` } : undefined}
       >
-        ROLL
+        <span aria-hidden>🎲</span>
+        {label}
       </button>
+      {note && <p className="text-center text-sm text-zinc-300">{note}</p>}
       <p className="text-sm text-zinc-500">
         {streakBefore > 0 ? `🔥 ${streakBefore}-day streak. Keep it going.` : "One shot. Make it count."}
       </p>

@@ -197,6 +197,27 @@ export const sfx = {
       noise(end, 0.9, 6000, 0.05, 1.5, 2500);
     }
   },
+  /** A reward unlocked: a bright little fanfare. */
+  reward() {
+    [0, 2, 4, 5].forEach((n, i) => tone(SCALE[n], i * 0.08, 0.22, "triangle", 0.06));
+    tone(SCALE[7], 0.34, 0.6, "sine", 0.05);
+    noise(0.34, 0.3, 6500, 0.025, 2);
+  },
+  /** A shield clanging into place. */
+  shield() {
+    noise(0, 0.06, 2400, 0.08, 4);
+    tone(220, 0, 0.35, "square", 0.04);
+    tone(330, 0.01, 0.3, "triangle", 0.06);
+    sweep(140, 70, 0.3, "sine", 0.12);
+  },
+  /** Fusing a family: gathering whoosh, then a big chord. */
+  fuse() {
+    noise(0, 0.9, 300, 0.07, 0.8, 4200);
+    sweep(80, 520, 0.9, "sawtooth", 0.03);
+    for (const f of [261.63, 329.63, 392, 523.25, 659.25]) tone(f, 0.9, 1.6, "triangle", 0.06);
+    sweep(120, 35, 0.8, "sine", 0.22, 0.9);
+    noise(0.9, 1.0, 7000, 0.04, 1.5, 2500);
+  },
   /** A loss: a sad trombone, "wah wah wah wahhh". */
   wheelLose() {
     const notes: [number, number, number][] = [

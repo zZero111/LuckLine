@@ -59,7 +59,6 @@ async function newPlayer(label: string) {
   if (ins.error) throw new Error(`profile ${label}: ${ins.error.message}`);
   return { client, id: data.user.id, name };
 }
-type Player = Awaited<ReturnType<typeof newPlayer>>;
 
 /** A finished roll on `daysAgo` days ago (outside the app, for time travel). */
 function backdate(uid: string, daysAgo: number, number = 777) {

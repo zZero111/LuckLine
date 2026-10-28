@@ -7,6 +7,13 @@ export interface RollBadge {
   ep: number;
 }
 
+/** Something extra a roll unlocked: a streak milestone, album reward, community bonus, hunt win or event reward. */
+export interface RollReward {
+  kind: "milestone" | "album" | "community" | "hunt" | "event";
+  title: string;
+  detail: string;
+}
+
 export interface RollResultData {
   roll_date: string;
   number: number;
@@ -21,8 +28,14 @@ export interface RollResultData {
   base_ep?: number;
   multiplier?: number;
   bonus_ep?: number;
-  /** reroll_today: true when this reroll used a free reroll from the wheel. */
+  /** reroll_today: true when this reroll used a free reroll from the wheel or a token. */
   free?: boolean;
+  /** Extra EP from a limited event's boosted badges (already included in ep). */
+  event_bonus?: number;
+  /** Rewards this roll unlocked (only on a roll made this visit). */
+  rewards?: RollReward[];
+  /** Streak length after this roll (only on a roll made this visit). */
+  streak?: number;
 }
 
 export interface WheelPrize {

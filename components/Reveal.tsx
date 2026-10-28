@@ -5,16 +5,17 @@ import type { DigitMatch } from "@/lib/badges/explain";
 import { badgeOneIn, formatOdds, percentileLine } from "@/lib/game/odds";
 import { sfx, vibrate } from "@/lib/game/sfx";
 import { tierColor, tierHype, tierRank } from "@/lib/game/tiers";
+import { DEFAULT_REVEAL_PALETTE } from "@/lib/game/cosmetics";
 import { Chip } from "./Chip";
 import { BadgeAura } from "./BadgeAura";
 import { Confetti } from "./Confetti";
+import { RewardList } from "./RewardList";
 import { ShareButton } from "./ShareButton";
 import { formatNumber, rollLabel, wheelTag, type RollResultData } from "./types";
 
 const SLOTS = 7; // 0 … 1,000,000 fits in seven digits: d,ddd,ddd
-// While the digits land, the stage cycles through these colours in a random order,
-// so the colour says nothing about the roll. The real tier colour appears at the end.
-const CYCLE = ["#8b5cf6", "#38bdf8", "#34d399", "#fbbf24", "#f472b6", "#fb923c", "#ef4444", "#22d3ee"];
+// While the digits land, the stage cycles through a palette in a random order, so
+// the colour says nothing about the roll. The real tier colour appears at the end.
 const TEASE_MS = 2000; // the last digit teases for every roll alike
 const SHAKE_CLASS = ["", "lk-shake-s", "lk-shake-m", "lk-shake", "lk-shake-xl"];
 
@@ -80,6 +81,8 @@ interface Props {
   onReplay?: () => void;
   /** Called once the reveal has finished (straight away when not animating). */
   onDone?: () => void;
+  /** Colours the stage cycles through (a Reveal cosmetic); the default palette if omitted. */
+  palette?: string[];
 }
 
 interface Stage {
@@ -92,7 +95,8 @@ interface Stage {
 }
 
 /** The roll reveal: a full-screen reel that lands digit by digit, then the result page. */
-export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: Props) {
+export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone, palette }: Props) {
+  const cycle = palette && palette.length > 1 ? palette : DEFAULT_REVEAL_PALETTE;
   const instant = !animate || prefersReducedMotion();
   const finalStage = useCallback(
     (r: RollResultData | null): Stage => ({
@@ -118,7 +122,7 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
   const [dim, setDim] = useState(false); // the stage goes black while a rare roll teases
   const [flash, setFlash] = useState(0); // full-screen flash trigger
   const [shock, setShock] = useState(0); // shockwave ring trigger (one per landed digit)
-  const [cycleAt] = useState(() => Math.floor(Math.random() * CYCLE.length)); // where the colour cycle starts
+  const [cycleAt] = useState(() => Math.floor(Math.random() * 64)); // where the colour cycle starts
   const [marks, setMarks] = useState<Record<string, DigitMatch | null>>({}); // which digits earned each badge
   const timers = useRef<number[]>([]);
   const quakeRef = useRef<HTMLDivElement>(null);
@@ -291,7 +295,7 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
 
   const glow = Math.min(1, view.locked / SLOTS);
   // Tier colour only once the tier has been revealed; before that, a colour that just cycles.
-  const stageColor = tierShown ? color : CYCLE[(cycleAt + view.locked * 3) % CYCLE.length];
+  const stageColor = tierShown ? color : cycle[(cycleAt + view.locked * 3) % cycle.length];
 
   return (
     <>
@@ -400,6 +404,11 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
                     {result.base_ep != null && ` · ${formatNumber(result.base_ep)} → ${formatNumber(result.ep)} EP`}
                   </p>
                 )}
+                {!!result.event_bonus && (
+                  <p className="rounded-full bg-orange-400/15 px-3 py-0.5 text-sm font-semibold text-orange-300">
+                    🔥 Event bonus +{formatNumber(result.event_bonus)} EP
+                  </p>
+                )}
                 <p className="text-sm text-zinc-400">{tierHype(result.tier)}</p>
               </>
             )}
@@ -448,6 +457,7 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
             })}
           </ul>
         )}
+        {result && view.done && !!result.rewards?.length && <RewardList rewards={result.rewards} />}
         {result && result.badges.length === 0 && view.tier && phase !== "stage" && (
           <p className="lk-fade text-sm text-zinc-500">No badges this time. Better luck tomorrow.</p>
         )}
