@@ -161,6 +161,63 @@ export const sfx = {
   peg() {
     tone(1200, 0, 0.02, "square", 0.012);
   },
+  /** The flapper clacking over a wheel peg. speed 0 (crawling) … 1 (full tilt): slower is lower, longer and heavier. */
+  wheelPeg(speed = 0.5) {
+    const s = Math.min(1, Math.max(0, speed));
+    const slow = 1 - s;
+    const pitch = 1650 - s * 650 + Math.random() * 140;
+    const dur = 0.03 + slow * 0.07;
+    tone(pitch, 0, dur, "triangle", 0.025 + slow * 0.05); // the wooden tock
+    noise(0, 0.02 + slow * 0.02, 3400, 0.02 + slow * 0.03, 2); // the click of the flapper
+    if (slow > 0.6) tone(pitch * 0.45, 0, dur * 2.2, "sine", 0.05 * slow); // body, as it crawls
+  },
+  /** The wheel being thrown: a whoosh that climbs, with a low thump. */
+  wheelStart() {
+    noise(0, 0.55, 260, 0.07, 0.8, 2600);
+    sweep(110, 420, 0.45, "sawtooth", 0.025);
+    sweep(120, 45, 0.25, "sine", 0.12);
+  },
+  /** A win: coins pouring out, brighter and longer for bigger prizes (level 1 small … 3 huge). */
+  wheelWin(level = 1) {
+    const l = Math.min(3, Math.max(1, Math.round(level)));
+    const coins = 4 + l * 3;
+    for (let i = 0; i < coins; i++) {
+      const f = SCALE[Math.min(SCALE.length - 1, 2 + Math.floor((i / coins) * 7))];
+      tone(f, i * 0.055, 0.16, "triangle", 0.06);
+      tone(f * 2, i * 0.055 + 0.01, 0.08, "sine", 0.025);
+      noise(i * 0.055, 0.03, 5200, 0.025, 3);
+    }
+    const end = coins * 0.055;
+    // "Cha-ching".
+    tone(1568, end + 0.04, 0.12, "square", 0.04);
+    tone(2093, end + 0.12, 0.5, "square", 0.04);
+    if (l >= 2) for (const f of [523.25, 659.25, 783.99]) tone(f, end + 0.1, 1.1, "sine", 0.05);
+    if (l >= 3) {
+      sweep(140, 40, 0.6, "sine", 0.22, end);
+      noise(end, 0.9, 6000, 0.05, 1.5, 2500);
+    }
+  },
+  /** A loss: a sad trombone, "wah wah wah wahhh". */
+  wheelLose() {
+    const notes: [number, number, number][] = [
+      [392, 350, 0.28],
+      [370, 330, 0.28],
+      [349, 310, 0.28],
+      [330, 190, 0.8],
+    ];
+    let t = 0;
+    for (const [from, to, dur] of notes) {
+      sweep(from, to, dur, "sawtooth", 0.05, t);
+      sweep(from * 0.5, to * 0.5, dur, "square", 0.02, t);
+      t += dur + 0.06;
+    }
+    sweep(90, 35, 0.5, "sine", 0.14, t - 0.8);
+  },
+  /** Nothing won: a soft deflating bloop. */
+  wheelNothing() {
+    sweep(520, 240, 0.28, "sine", 0.08);
+    noise(0.02, 0.2, 900, 0.03, 1, 300);
+  },
   tick() {
     tone(300 + Math.random() * 500, 0, 0.025, "square", 0.012);
   },

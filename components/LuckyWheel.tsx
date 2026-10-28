@@ -92,6 +92,7 @@ export function LuckyWheel({ prizes, spin, target, onSpin, onSettled }: Props) {
   async function start() {
     if (phase !== "idle" || !target) return;
     sfx.unlock();
+    sfx.wheelStart();
     setError(null);
     setPhase("spinning");
     const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -104,8 +105,9 @@ export function LuckyWheel({ prizes, spin, target, onSpin, onSettled }: Props) {
       last = now;
       const t = Math.floor(rotation.current / 15);
       if (t !== lastTick) {
+        // At full speed the pegs blur together: only every other one is heard.
+        if (t % 2 === 0) sfx.wheelPeg(1);
         lastTick = t;
-        sfx.tick();
       }
       frame.current = requestAnimationFrame(free);
     };
@@ -136,10 +138,13 @@ export function LuckyWheel({ prizes, spin, target, onSpin, onSettled }: Props) {
       setOutcome(result);
       const k = result.prize;
       if (k.kind === "multiplier" && k.value < 1) {
-        sfx.tier(0);
+        sfx.wheelLose();
+      } else if (k.kind === "nothing") {
+        sfx.wheelNothing();
       } else {
-        const rank = k.kind === "multiplier" ? (k.value >= 10 ? 6 : k.value >= 5 ? 5 : k.value >= 3 ? 4 : 3) : k.kind === "nothing" ? 1 : 3;
-        sfx.tier(rank);
+        const level = k.kind === "multiplier" ? (k.value >= 5 ? 3 : k.value >= 3 ? 2 : 1) : 1;
+        sfx.wheelWin(level);
+        const rank = k.kind === "multiplier" ? (k.value >= 10 ? 6 : k.value >= 5 ? 5 : k.value >= 3 ? 4 : 3) : 3;
         if (rank >= 4) setBurst((b) => b + 1);
         if (rank >= 3) vibrate(rank >= 5 ? [60, 40, 60, 40, 180] : [40, 30, 80]);
       }
@@ -161,7 +166,9 @@ export function LuckyWheel({ prizes, spin, target, onSpin, onSettled }: Props) {
       const t = Math.floor(rotation.current / 15);
       if (t !== tick) {
         tick = t;
-        sfx.tick();
+        // The wheel's speed (1 = free spin) falls away as it slows, so the clacks get slower and heavier.
+        const speed = (1 - p) * (1 - p);
+        if (speed > 0.7 ? t % 2 === 0 : true) sfx.wheelPeg(speed);
       }
       if (p < 1) frame.current = requestAnimationFrame(ease);
       else land();
