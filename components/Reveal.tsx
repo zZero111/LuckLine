@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { DigitMatch } from "@/lib/badges/explain";
 import { badgeOneIn, formatOdds, percentileLine } from "@/lib/game/odds";
 import { sfx, vibrate } from "@/lib/game/sfx";
 import { tierColor, tierHype, tierRank } from "@/lib/game/tiers";
@@ -11,6 +12,10 @@ import { ShareButton } from "./ShareButton";
 import { formatNumber, rollLabel, wheelTag, type RollResultData } from "./types";
 
 const SLOTS = 7; // 0 … 1,000,000 fits in seven digits: d,ddd,ddd
+// While the digits land, the stage cycles through these colours in a random order,
+// so the colour says nothing about the roll. The real tier colour appears at the end.
+const CYCLE = ["#8b5cf6", "#38bdf8", "#34d399", "#fbbf24", "#f472b6", "#fb923c", "#ef4444", "#22d3ee"];
+const TEASE_MS = 2000; // the last digit teases for every roll alike
 const SHAKE_CLASS = ["", "lk-shake-s", "lk-shake-m", "lk-shake", "lk-shake-xl"];
 
 /** The cinematic full-screen roll, then a crossfade back to the page. */
@@ -37,6 +42,30 @@ function randomReel(): string[] {
 
 function prefersReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+}
+
+/** The roll's digits with the ones that earned a badge lit up. */
+function DigitBreakdown({ match, show }: { match: DigitMatch; show: boolean }) {
+  return (
+    <div
+      className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-zinc-800 pt-3"
+      aria-label={match.whole ? "The whole number earned this badge" : `Digits that earned this badge: ${match.digits.filter((_, i) => match.hit[i]).join(", ")}`}
+    >
+      {match.digits.map((d, i) => (
+        <span
+          key={i}
+          aria-hidden
+          className={`grid h-6 min-w-6 place-items-center rounded px-1 font-mono text-xs font-bold tabular-nums ${
+            match.hit[i] ? `bg-zinc-100 text-zinc-900 ${show ? "lk-pop" : ""}` : "bg-zinc-800 text-zinc-500"
+          }`}
+          style={match.hit[i] ? { animationDelay: `${150 + i * 50}ms` } : undefined}
+        >
+          {d}
+        </span>
+      ))}
+      {match.whole && match.digits.length > 1 && <span className="ml-1 text-[11px] text-zinc-500">whole number</span>}
+    </div>
+  );
 }
 
 interface Props {
@@ -89,6 +118,8 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
   const [dim, setDim] = useState(false); // the stage goes black while a rare roll teases
   const [flash, setFlash] = useState(0); // full-screen flash trigger
   const [shock, setShock] = useState(0); // shockwave ring trigger (one per landed digit)
+  const [cycleAt] = useState(() => Math.floor(Math.random() * CYCLE.length)); // where the colour cycle starts
+  const [marks, setMarks] = useState<Record<string, DigitMatch | null>>({}); // which digits earned each badge
   const timers = useRef<number[]>([]);
   const quakeRef = useRef<HTMLDivElement>(null);
 
@@ -97,6 +128,19 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
   const firstSignificant = result ? Math.min(SLOTS - 1, SLOTS - String(result.number).length) : SLOTS;
   const rank = result ? tierRank(result.tier) : 1;
   const color = result ? tierColor(result.tier) : "#8b5cf6";
+
+  // Work out which digits earned each badge (loaded on demand: it pulls in the badge tests).
+  useEffect(() => {
+    if (!result) return;
+    let cancelled = false;
+    import("@/lib/badges/explain").then(({ explainBadge }) => {
+      if (cancelled) return;
+      setMarks(Object.fromEntries(result.badges.map((b) => [b.slug, explainBadge(b.slug, result.number)])));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [result]);
 
   // Spin the unlocked slots.
   useEffect(() => {
@@ -124,25 +168,24 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
     if (!result || instant) return;
     const at = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms));
     const r = tierRank(result.tier);
-    // The last digit teases longer the rarer the roll (rare .. mythic).
-    const TEASE = [0, 0, 0, 1500, 2200, 3000, 4000];
+    // Everything before the tier lands is identical for every roll, so nothing
+    // (colour, pause, shake) gives the result away early.
     let t = 500;
     for (let i = 0; i < SLOTS; i++) {
       const last = i === SLOTS - 1;
       const significant = i >= firstSignificant;
-      if (last && r >= 3) {
+      if (last) {
         at(t, () => {
           setStage((s) => ({ ...s, suspense: true }));
-          if (r >= 5) setDim(true);
+          setDim(true);
           sfx.suspense();
         });
-        // Heartbeats while the last digit teases on the rarest rolls.
-        if (r >= 5) for (let h = 500; h < TEASE[r] - 200; h += 700) at(t + h, () => sfx.heartbeat());
-        t += TEASE[r];
+        for (let h = 500; h < TEASE_MS - 200; h += 700) at(t + h, () => sfx.heartbeat());
+        t += TEASE_MS;
       }
       // Leading zeros drop quickly; every real digit gets a slow, heavy beat.
-      t += significant ? 650 + (r >= 4 ? 120 : 0) + (i - firstSignificant) * 30 : 170;
-      const power = 0.85 + (significant ? (i - firstSignificant) * 0.14 : 0) + r * 0.09;
+      t += significant ? 700 + (i - firstSignificant) * 30 : 170;
+      const power = 1.1 + (significant ? (i - firstSignificant) * 0.14 : 0);
       at(t, () => {
         setStage((s) => ({ ...s, locked: i + 1, suspense: false }));
         sfx.lock(i);
@@ -154,7 +197,7 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
         }
       });
     }
-    t += r >= 5 ? 1100 : 800;
+    t += 800;
     at(t, () => {
       setDim(false);
       setStage((s) => ({ ...s, tier: true }));
@@ -247,6 +290,8 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
     });
 
   const glow = Math.min(1, view.locked / SLOTS);
+  // Tier colour only once the tier has been revealed; before that, a colour that just cycles.
+  const stageColor = tierShown ? color : CYCLE[(cycleAt + view.locked * 3) % CYCLE.length];
 
   return (
     <>
@@ -273,9 +318,9 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
           style={{
             background: dim
               ? "#000"
-              : `radial-gradient(ellipse at 50% 45%, ${color}${hexAlpha(0.06 + glow * 0.32)} 0%, transparent 66%), #09090b`,
-            transition: "background 0.6s, opacity 0.5s",
-            ["--tier" as string]: color,
+              : `radial-gradient(ellipse at 50% 45%, ${stageColor}${hexAlpha(0.06 + glow * 0.32)} 0%, transparent 66%), #09090b`,
+            transition: "background 0.35s, opacity 0.5s",
+            ["--tier" as string]: stageColor,
           }}
         >
           <div ref={quakeRef} className={`relative flex w-full flex-col items-center gap-[4vmin] px-3 text-center ${SHAKE_CLASS[shake]}`}>
@@ -285,7 +330,7 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
             </p>
             <p
               className={`relative flex items-end justify-center font-mono text-[clamp(3rem,14vw,13rem)] font-black leading-none tabular-nums ${dim ? "lk-heartbeat" : ""}`}
-              style={{ textShadow: result && view.locked > firstSignificant ? `0 0 ${20 + glow * 40}px ${color}88` : undefined }}
+              style={{ textShadow: result && view.locked > firstSignificant ? `0 0 ${20 + glow * 40}px ${stageColor}88` : undefined }}
             >
               {reelSlots(true)}
             </p>
@@ -373,9 +418,10 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
                 <li key={b.slug} className={shown ? "lk-pop" : "invisible"}>
                   <BadgeAura slug={b.slug} rarity={b.rarity} active={shown}>
                     <div
-                      className="flex items-center gap-3 rounded-xl border bg-zinc-900/90 px-4 py-3"
+                      className="rounded-xl border bg-zinc-900/90 px-4 py-3"
                       style={{ borderColor: `${tierColor(b.rarity)}77` }}
                     >
+                    <div className="flex items-center gap-3">
                       <span className="text-3xl" aria-hidden>
                         {b.emoji}
                       </span>
@@ -386,13 +432,15 @@ export function Reveal({ result, animate, newSlugs, streak, onReplay, onDone }: 
                             <span className="lk-new rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-950">New!</span>
                           )}
                         </p>
-                        <p className="truncate text-xs text-zinc-500">{b.description}</p>
+                        <p className="text-xs text-zinc-500">{b.description}</p>
                         {odds && <p className="text-[11px] text-zinc-500">{formatOdds(odds)}</p>}
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         <Chip value={b.rarity} />
                         <span className="text-sm font-semibold tabular-nums text-violet-300">+{formatNumber(b.ep)} EP</span>
                       </div>
+                    </div>
+                    {marks[b.slug] && <DigitBreakdown match={marks[b.slug]!} show={shown} />}
                     </div>
                   </BadgeAura>
                 </li>
