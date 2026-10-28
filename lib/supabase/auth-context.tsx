@@ -23,24 +23,46 @@ interface AuthValue {
   avatarPath: string | null;
   /** True when an admin removed the player's picture; uploads are blocked. */
   avatarLocked: boolean;
+  /** Cosmetics the player has equipped (ids), or null for none. */
+  cosmetics: { aura: string | null; frame: string | null; reveal: string | null; nameStyle: string | null };
+  /** EP the player can spend (0 until loaded). */
+  balance: number;
   refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
 
-type ProfileFields = { displayName: string | null; avatarPath: string | null; avatarLocked: boolean };
+type ProfileFields = {
+  displayName: string | null;
+  avatarPath: string | null;
+  avatarLocked: boolean;
+  aura: string | null;
+  frame: string | null;
+  reveal: string | null;
+  nameStyle: string | null;
+  balance: number;
+};
 type ProfileState = { userId: string } & ProfileFields;
 
 async function fetchProfile(userId: string): Promise<ProfileFields> {
-  const { data } = await createClient()
-    .from("profiles")
-    .select("display_name, avatar_path, avatar_locked")
-    .eq("id", userId)
-    .maybeSingle();
+  const supabase = createClient();
+  const [{ data }, wallet] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("display_name, avatar_path, avatar_locked, aura, frame, reveal, name_style")
+      .eq("id", userId)
+      .maybeSingle(),
+    supabase.from("ep_wallets").select("balance").eq("user_id", userId).maybeSingle(),
+  ]);
   return {
     displayName: data?.display_name ?? null,
     avatarPath: data?.avatar_path ?? null,
     avatarLocked: data?.avatar_locked ?? false,
+    aura: data?.aura ?? null,
+    frame: data?.frame ?? null,
+    reveal: data?.reveal ?? null,
+    nameStyle: data?.name_style ?? null,
+    balance: Number(wallet.data?.balance ?? 0),
   };
 }
 
@@ -89,6 +111,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       displayName,
       avatarPath: mine?.avatarPath ?? null,
       avatarLocked: mine?.avatarLocked ?? false,
+      cosmetics: {
+        aura: mine?.aura ?? null,
+        frame: mine?.frame ?? null,
+        reveal: mine?.reveal ?? null,
+        nameStyle: mine?.nameStyle ?? null,
+      },
+      balance: mine?.balance ?? 0,
       refreshProfile,
     };
   }, [session, profile, refreshProfile]);

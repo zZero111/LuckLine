@@ -137,8 +137,10 @@ function Layers({ spec }: { spec: AuraSpec }) {
 }
 
 interface Props {
-  slug: string;
-  rarity: string;
+  slug?: string;
+  rarity?: string;
+  /** A ready-made aura (for cosmetics); replaces the one worked out from slug and rarity. */
+  spec?: AuraSpec;
   /** Mounts the effects (so they start when the badge appears). */
   active?: boolean;
   /** 0..1: lower for busy lists such as the collection page. */
@@ -151,8 +153,8 @@ interface Props {
  * Wraps a badge card in an aura. The card keeps its own background; the glow
  * and effects sit around and over it. Bigger and wilder for rarer badges.
  */
-export function BadgeAura({ slug, rarity, active = true, intensity = 1, className = "", children }: Props) {
-  const spec = useMemo(() => auraFor(slug, rarity, intensity), [slug, rarity, intensity]);
+export function BadgeAura({ slug = "", rarity = "common", spec: given, active = true, intensity = 1, className = "", children }: Props) {
+  const spec = useMemo(() => given ?? auraFor(slug, rarity, intensity), [given, slug, rarity, intensity]);
   const style: Vars = {
     "--aura": spec.color,
     "--aura-size": `${spec.size}px`,
