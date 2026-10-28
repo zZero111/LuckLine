@@ -541,3 +541,58 @@ html, body { overflow-x: clip; }
   .lk-lock, .lk-tease, .lk-slam, .lk-pop, .lk-fade, .lk-shake, .lk-pulse { animation: none; }
   .lk-confetti { display: none; }
 }
+
+/* ---------------------------------------------------------------------------
+   Cosmetics: name styles and avatar frames
+   ------------------------------------------------------------------------- */
+
+@keyframes lk-prism-text { to { background-position: 200% 0; } }
+@keyframes lk-glitch {
+  0%, 92%, 100% { transform: translate(0); text-shadow: 1px 0 #f0abfc, -1px 0 #67e8f9; }
+  94% { transform: translate(-2px, 0); text-shadow: 2px 0 #f0abfc, -2px 0 #67e8f9; }
+  96% { transform: translate(2px, 1px); text-shadow: -2px 0 #f0abfc, 2px 0 #67e8f9; }
+  98% { transform: translate(-1px, -1px); }
+}
+.lk-name-gold { color: #fde68a; text-shadow: 0 0 10px rgb(251 191 36 / 0.7); }
+.lk-name-prism {
+  background: linear-gradient(90deg, #f87171, #fbbf24, #34d399, #38bdf8, #a78bfa, #f472b6, #f87171);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: lk-prism-text 3s linear infinite;
+}
+.lk-name-hunter { color: #fcd34d; text-shadow: 0 0 8px #f59e0b, 0 0 18px rgb(245 158 11 / 0.55); }
+.lk-name-neon { color: #fbcfe8; text-shadow: 0 0 6px #ec4899, 0 0 16px #ec4899; }
+.lk-name-ice { color: #bae6fd; text-shadow: 0 0 8px #38bdf8, 0 0 16px rgb(56 189 248 / 0.5); }
+.lk-name-ember { color: #fed7aa; text-shadow: 0 0 8px #f97316, 0 -2px 10px rgb(239 68 68 / 0.6); }
+.lk-name-glitch { display: inline-block; color: #ecfccb; animation: lk-glitch 2.6s steps(1, end) infinite; }
+
+/* A ring around a profile picture. The inner picture keeps its own size. */
+.lk-frame { display: inline-flex; border-radius: 9999px; padding: 3px; flex-shrink: 0; }
+.lk-frame > * { box-shadow: 0 0 0 2px #09090b; }
+.lk-frame-gold { background: linear-gradient(135deg, #fef3c7, #f59e0b 45%, #fde68a); box-shadow: 0 0 10px rgb(251 191 36 / 0.45); }
+.lk-frame-neon { background: #22d3ee; box-shadow: 0 0 6px #22d3ee, 0 0 16px rgb(34 211 238 / 0.7); }
+.lk-frame-ice { background: linear-gradient(135deg, #e0f2fe, #38bdf8 50%, #bae6fd); box-shadow: 0 0 10px rgb(56 189 248 / 0.5); }
+@keyframes lk-flame-ring { 0%, 100% { filter: hue-rotate(0deg) brightness(1); } 50% { filter: hue-rotate(-18deg) brightness(1.25); } }
+.lk-frame-flame { background: linear-gradient(0deg, #ef4444, #fb923c 55%, #fde047); box-shadow: 0 0 12px rgb(251 146 60 / 0.6); animation: lk-flame-ring 1.4s ease-in-out infinite; }
+.lk-frame-centurion {
+  background: conic-gradient(from 0deg, #fef08a, #ca8a04, #fef08a, #ca8a04, #fef08a);
+  box-shadow: 0 0 0 1px #713f12, 0 0 14px rgb(250 204 21 / 0.6);
+  padding: 4px;
+}
+.lk-frame-prism { background: conic-gradient(from var(--lk-ang), #f43f5e, #f59e0b, #84cc16, #22d3ee, #8b5cf6, #ec4899, #f43f5e); animation: lk-ang 3s linear infinite; box-shadow: 0 0 12px rgb(232 121 249 / 0.5); }
+
+/* An event day tints the whole page (set by the Play page). */
+body[data-event]::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% -10%, color-mix(in srgb, var(--event-color, #fb923c) 24%, transparent), transparent 62%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lk-name-prism, .lk-name-glitch, .lk-frame-flame, .lk-frame-prism { animation: none; }
+}

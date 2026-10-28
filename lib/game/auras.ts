@@ -113,3 +113,30 @@ export function auraFor(slug: string, rarity: string, intensity = 1): AuraSpec {
     count: (0.45 + rank / 6) * (0.5 + 0.5 * intensity),
   };
 }
+
+const THEME_COLOR: Record<Exclude<AuraTheme, null>, string> = {
+  fire: "#fb923c",
+  void: "#a855f7",
+  code: "#22c55e",
+  gold: "#facc15",
+  cosmic: "#818cf8",
+  electric: "#67e8f9",
+};
+
+/** An aura for a purchased cosmetic: the theme's effects at a fixed, shop-friendly strength. */
+export function cosmeticAura(theme: Exclude<AuraTheme, null>, strength = 1): AuraSpec {
+  const kinds: AuraKind[] = [THEME_KIND[theme]];
+  if (theme !== "electric") kinds.push("sparkle");
+  if (theme === "electric") kinds.push("orbit");
+  return {
+    rank: 4,
+    color: THEME_COLOR[theme],
+    theme,
+    kinds,
+    size: Math.round(20 * strength),
+    alpha: 0.7,
+    hue: 0,
+    seed: hashString(theme),
+    count: 0.9 * strength,
+  };
+}

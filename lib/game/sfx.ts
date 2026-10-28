@@ -161,6 +161,84 @@ export const sfx = {
   peg() {
     tone(1200, 0, 0.02, "square", 0.012);
   },
+  /** The flapper clacking over a wheel peg. speed 0 (crawling) … 1 (full tilt): slower is lower, longer and heavier. */
+  wheelPeg(speed = 0.5) {
+    const s = Math.min(1, Math.max(0, speed));
+    const slow = 1 - s;
+    const pitch = 1650 - s * 650 + Math.random() * 140;
+    const dur = 0.03 + slow * 0.07;
+    tone(pitch, 0, dur, "triangle", 0.025 + slow * 0.05); // the wooden tock
+    noise(0, 0.02 + slow * 0.02, 3400, 0.02 + slow * 0.03, 2); // the click of the flapper
+    if (slow > 0.6) tone(pitch * 0.45, 0, dur * 2.2, "sine", 0.05 * slow); // body, as it crawls
+  },
+  /** The wheel being thrown: a whoosh that climbs, with a low thump. */
+  wheelStart() {
+    noise(0, 0.55, 260, 0.07, 0.8, 2600);
+    sweep(110, 420, 0.45, "sawtooth", 0.025);
+    sweep(120, 45, 0.25, "sine", 0.12);
+  },
+  /** A win: coins pouring out, brighter and longer for bigger prizes (level 1 small … 3 huge). */
+  wheelWin(level = 1) {
+    const l = Math.min(3, Math.max(1, Math.round(level)));
+    const coins = 4 + l * 3;
+    for (let i = 0; i < coins; i++) {
+      const f = SCALE[Math.min(SCALE.length - 1, 2 + Math.floor((i / coins) * 7))];
+      tone(f, i * 0.055, 0.16, "triangle", 0.06);
+      tone(f * 2, i * 0.055 + 0.01, 0.08, "sine", 0.025);
+      noise(i * 0.055, 0.03, 5200, 0.025, 3);
+    }
+    const end = coins * 0.055;
+    // "Cha-ching".
+    tone(1568, end + 0.04, 0.12, "square", 0.04);
+    tone(2093, end + 0.12, 0.5, "square", 0.04);
+    if (l >= 2) for (const f of [523.25, 659.25, 783.99]) tone(f, end + 0.1, 1.1, "sine", 0.05);
+    if (l >= 3) {
+      sweep(140, 40, 0.6, "sine", 0.22, end);
+      noise(end, 0.9, 6000, 0.05, 1.5, 2500);
+    }
+  },
+  /** A reward unlocked: a bright little fanfare. */
+  reward() {
+    [0, 2, 4, 5].forEach((n, i) => tone(SCALE[n], i * 0.08, 0.22, "triangle", 0.06));
+    tone(SCALE[7], 0.34, 0.6, "sine", 0.05);
+    noise(0.34, 0.3, 6500, 0.025, 2);
+  },
+  /** A shield clanging into place. */
+  shield() {
+    noise(0, 0.06, 2400, 0.08, 4);
+    tone(220, 0, 0.35, "square", 0.04);
+    tone(330, 0.01, 0.3, "triangle", 0.06);
+    sweep(140, 70, 0.3, "sine", 0.12);
+  },
+  /** Fusing a family: gathering whoosh, then a big chord. */
+  fuse() {
+    noise(0, 0.9, 300, 0.07, 0.8, 4200);
+    sweep(80, 520, 0.9, "sawtooth", 0.03);
+    for (const f of [261.63, 329.63, 392, 523.25, 659.25]) tone(f, 0.9, 1.6, "triangle", 0.06);
+    sweep(120, 35, 0.8, "sine", 0.22, 0.9);
+    noise(0.9, 1.0, 7000, 0.04, 1.5, 2500);
+  },
+  /** A loss: a sad trombone, "wah wah wah wahhh". */
+  wheelLose() {
+    const notes: [number, number, number][] = [
+      [392, 350, 0.28],
+      [370, 330, 0.28],
+      [349, 310, 0.28],
+      [330, 190, 0.8],
+    ];
+    let t = 0;
+    for (const [from, to, dur] of notes) {
+      sweep(from, to, dur, "sawtooth", 0.05, t);
+      sweep(from * 0.5, to * 0.5, dur, "square", 0.02, t);
+      t += dur + 0.06;
+    }
+    sweep(90, 35, 0.5, "sine", 0.14, t - 0.8);
+  },
+  /** Nothing won: a soft deflating bloop. */
+  wheelNothing() {
+    sweep(520, 240, 0.28, "sine", 0.08);
+    noise(0.02, 0.2, 900, 0.03, 1, 300);
+  },
   tick() {
     tone(300 + Math.random() * 500, 0, 0.025, "square", 0.012);
   },

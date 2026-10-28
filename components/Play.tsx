@@ -3,8 +3,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { sfx } from "@/lib/game/sfx";
+import { revealPalette } from "@/lib/game/cosmetics";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/supabase/auth-context";
+import { CommunityCard, type CommunityStatus } from "./CommunityCard";
+import { EventBanner, NextEventTeaser, useEventTint, type EventStatus } from "./EventBanner";
+import { HuntCard, HuntChance, HuntStreak, type HuntStatus } from "./HuntPanel";
 import { LuckyWheel, type SpinOutcome } from "./LuckyWheel";
 import { RerollPanel } from "./RerollPanel";
 import { Reveal } from "./Reveal";
@@ -59,13 +63,25 @@ function newSlugsFor(day: DayState, roll: RollResultData) {
   return new Set(roll.badges.map((b) => b.slug).filter((slug) => !seen.has(slug)));
 }
 
+/** Everything the home page shows besides the day's rolls. */
+interface Extras {
+  event: EventStatus | null;
+  hunt: HuntStatus | null;
+  community: CommunityStatus | null;
+  streak: { current: number; shield_will_cover: boolean; at_risk: boolean; shields: { count: number } } | null;
+  /** Free rerolls from rewards. */
+  tokens: number;
+}
+
 const skeleton = <div className="h-40 w-full max-w-md lk-shimmer rounded-xl bg-zinc-900" />;
 
 /** The home page play area: sign-in prompt, roll button, reveal and rerolls. */
 export function Play() {
-  const { status, user, displayName } = useAuth();
+  const { status, user, displayName, cosmetics, refreshProfile } = useAuth();
   const [day, setDay] = useState<DayState | null>(null);
   const [reload, setReload] = useState(0);
+  const [extras, setExtras] = useState<Extras | null>(null);
+  const [extrasKey, setExtrasKey] = useState(0);
   // A roll in flight or just made this visit: animate its reveal.
   const [live, setLive] = useState<{ key: number; result: RollResultData | null } | null>(null);
   const [shownAttempt, setShownAttempt] = useState<number | null>(null);
@@ -73,6 +89,33 @@ export function Play() {
   const [error, setError] = useState<ReturnType<typeof friendlyError> | null>(null);
   const userId = user?.id;
   const hasProfile = typeof displayName === "string";
+  useEventTint(extras?.event?.today?.color ?? null);
+
+  useEffect(() => {
+    if (!userId || !hasProfile) return;
+    let cancelled = false;
+    const supabase = createClient();
+    Promise.all([
+      supabase.rpc("event_status"),
+      supabase.rpc("hunt_today"),
+      supabase.rpc("my_streak"),
+      supabase.rpc("community_today"),
+      supabase.from("reroll_tokens").select("count").eq("user_id", userId).maybeSingle(),
+    ]).then(([ev, hunt, streak, community, tokens]) => {
+      if (cancelled) return;
+      const huntData = hunt.data as unknown as HuntStatus | null;
+      setExtras({
+        event: (ev.data as unknown as EventStatus | null) ?? null,
+        hunt: huntData?.available ? huntData : null,
+        community: (community.data as unknown as CommunityStatus | null) ?? null,
+        streak: (streak.data as unknown as Extras["streak"]) ?? null,
+        tokens: Number(tokens.data?.count ?? 0),
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, hasProfile, extrasKey]);
 
   useEffect(() => {
     if (!userId || !hasProfile) return;
@@ -83,7 +126,7 @@ export function Play() {
       supabase
         .from("rolls")
         .select(
-          "roll_date, attempt, number, ep, base_ep, multiplier, bonus_ep, tier, roll_badges(badges(slug, name, emoji, description, rarity, ep))",
+          "roll_date, attempt, number, ep, base_ep, multiplier, bonus_ep, event_bonus_ep, free_reroll, tier, roll_badges(badges(slug, name, emoji, description, rarity, ep))",
         )
         .eq("user_id", userId)
         .order("roll_date", { ascending: false })
@@ -118,6 +161,8 @@ export function Play() {
             base_ep: row.base_ep,
             multiplier: Number(row.multiplier),
             bonus_ep: row.bonus_ep,
+            event_bonus: row.event_bonus_ep,
+            free: row.free_reroll,
             tier: row.tier,
             badges,
           });
@@ -204,14 +249,21 @@ export function Play() {
     await new Promise((r) => setTimeout(r, Math.max(0, SPIN_MS - (Date.now() - started))));
     const result = data as unknown as RollResultData;
     result.badges = [...result.badges].sort((a, b) => b.ep - a.ep);
-    setDay((d) =>
-      d && {
-        ...d,
-        rolls: [...d.rolls.filter((r) => r.attempt !== result.attempt), result],
-        balance: result.balance ?? d.balance,
-        spin: result.free && d.spin ? { ...d.spin, free_reroll_used: true } : d.spin,
-      },
+    // A free reroll uses the wheel's first, then a reward token (the same order as the database).
+    const wheelFree = (d: DayState) =>
+      !!d.spin && d.prizes.find((p) => p.id === d.spin!.prize_id)?.kind === "free_reroll" && !d.spin.free_reroll_used;
+    setDay(
+      (d) =>
+        d && {
+          ...d,
+          rolls: [...d.rolls.filter((r) => r.attempt !== result.attempt), result],
+          balance: result.balance ?? d.balance,
+          spin: result.free && d.spin && wheelFree(d) ? { ...d.spin, free_reroll_used: true } : d.spin,
+        },
     );
+    if (result.free) setExtras((x) => x && (day && wheelFree(day) ? x : { ...x, tokens: Math.max(0, x.tokens - 1) }));
+    setExtrasKey((k) => k + 1);
+    void refreshProfile();
     setShownAttempt(result.attempt ?? 0);
     setLive({ key, result });
   }
@@ -246,7 +298,16 @@ export function Play() {
 
   if (!day || day.userId !== userId) return skeleton;
 
-  const streak = day.streakBefore + 1;
+  const streakBefore = extras?.streak?.current ?? day.streakBefore;
+  const streak = (live?.result?.streak ?? undefined) || streakBefore + 1;
+  const event = extras?.event?.today ?? null;
+  const next = extras?.event?.next ?? null;
+  const tokens = extras?.tokens ?? 0;
+  const shieldNote = extras?.streak?.shield_will_cover
+    ? "🛡 A streak shield will cover the day you missed."
+    : extras?.streak?.at_risk
+      ? "Your streak ended while you were away. Today starts a new one."
+      : null;
   const errorBox = error && (
     <div role="alert" className="flex flex-col items-center gap-2 rounded-lg border border-rose-800 bg-rose-950/50 px-4 py-3 text-sm text-rose-200">
       <p>{error.text}</p>
@@ -272,9 +333,20 @@ export function Play() {
 
   // No roll yet today (and none in flight): the big button.
   if (!day.rolls.length && !live) {
+    const rerolls = day.terms.max_per_day + tokens;
     return (
-      <div className="flex flex-col items-center gap-6">
-        <RollButton onRoll={() => roll("roll")} streakBefore={day.streakBefore} />
+      <div className="flex w-full flex-col items-center gap-6">
+        {event ? <EventBanner event={event} next={next} /> : next && <NextEventTeaser next={next} />}
+        {extras?.hunt && <HuntCard hunt={extras.hunt} />}
+        <RollButton
+          onRoll={() => roll("roll")}
+          streakBefore={streakBefore}
+          label={event?.roll_label ?? "ROLL"}
+          color={event?.color}
+          note={[shieldNote, `Your daily roll is ready. ${rerolls} ${rerolls === 1 ? "reroll" : "rerolls"} available.`].filter(Boolean).join(" ")}
+        />
+        {extras?.hunt && <HuntStreak hunt={extras.hunt} />}
+        {extras?.hunt && <HuntChance hunt={extras.hunt} />}
         {errorBox}
       </div>
     );
@@ -285,8 +357,11 @@ export function Play() {
   const lastAttempt = latest ? (latest.attempt ?? 0) : 0;
   const spinPrize = day.spin ? day.prizes.find((p) => p.id === day.spin!.prize_id) : undefined;
   const wonFreeReroll = spinPrize?.kind === "free_reroll";
-  const freeAvailable = wonFreeReroll && !day.spin!.free_reroll_used;
-  const rerollsLeft = day.terms.max_per_day + (wonFreeReroll ? 1 : 0) - lastAttempt;
+  const wheelFreeLeft = wonFreeReroll && !day.spin!.free_reroll_used ? 1 : 0;
+  const freeCount = wheelFreeLeft + tokens;
+  const freeAvailable = freeCount > 0;
+  const paidUsed = day.rolls.filter((r) => (r.attempt ?? 0) > 0 && !r.free).length;
+  const rerollsLeft = Math.max(0, day.terms.max_per_day - paidUsed) + freeCount;
 
   return (
     <div className="flex w-full flex-col items-center gap-8">
@@ -297,6 +372,7 @@ export function Play() {
           animate
           newSlugs={live.result ? newSlugsFor(day, live.result) : undefined}
           streak={live.result ? streak : undefined}
+          palette={revealPalette(cosmetics.reveal)}
           onDone={markDone}
           onReplay={() => {
             sfx.unlock();
@@ -322,7 +398,7 @@ export function Play() {
           balance={day.balance}
           price={day.terms.price}
           rerollsLeft={rerollsLeft}
-          maxPerDay={day.terms.max_per_day + (wonFreeReroll ? 1 : 0)}
+          maxPerDay={rerollsLeft + Math.max(0, day.rolls.length - 1)}
           freeAvailable={freeAvailable}
           rolls={day.rolls}
           shown={shown}
@@ -333,6 +409,7 @@ export function Play() {
           }}
         />
       )}
+      {revealDone && latest && extras?.community && <CommunityCard data={extras.community} />}
       {revealDone && latest && day.prizes.length > 0 && (
         <LuckyWheel
           prizes={day.prizes}
@@ -342,6 +419,9 @@ export function Play() {
           onSettled={applySpin}
         />
       )}
+      {revealDone && latest && extras?.hunt && <HuntCard hunt={extras.hunt} />}
+      {revealDone && latest && extras?.hunt && <HuntStreak hunt={extras.hunt} />}
+      {revealDone && latest && event && <EventBanner event={event} next={next} />}
     </div>
   );
 }

@@ -73,6 +73,34 @@ transaction (a minute or two) rolls still work and are rescored by
 `rescore_all()`; the old site keeps working against the new schema until the
 new one deploys.
 
+### Streaks, shop, events, community number, Badge Hunt, fusion, weekly recap
+
+Two migrations and no data load: badges and `number_stats` are unchanged.
+
+```bash
+git pull && npm ci
+npx supabase db push        # applies 20261101120000_credits_and_cosmetics.sql and 20261101130000_engagement_features.sql
+```
+
+Then merge the PR. Nothing else to set up. Existing wallets, rolls and the
+leaderboard are untouched.
+
+- **Game constants** live in the database (change them with a new migration):
+  shield price 600 EP and max 3 (`private.shield_price()`, `private.max_shields()`),
+  the community bonus ladder (`private.community_bonus()`), hunt wins needed
+  (`private.hunt_wins_needed()`), fusion reward (`private.fusion_reward()`),
+  streak milestones (`streak_milestone_defs`), album rewards (`album_rewards`),
+  shop items and prices (`cosmetics`).
+- **Events** are rows in `game_events` and dates in `event_days` (seeded through
+  2028: every Friday the 13th, 11/11, 7/7, 3/14, 6/9 and 1/1). To add a one-off
+  day: `insert into public.event_days (day, event_id) values ('2026-12-25', 1);`
+  A boosted badge pays (multiplier − 1) × its EP on top of the roll.
+- **Badge Hunt** picks one badge a day with 8 to 40 EP (about a 1-in-8 to
+  1-in-40 roll) the first time anyone asks for it; the bonus is 10× its EP.
+- After you change `number_stats` or the badges, `select private.rescore_all();`
+  keeps every EP credit, so rewards players already earned are never lost.
+- Check the result with `npm run test:features` against a local stack.
+
 ### Password sign-in
 
 Front-end only: no migration, no data load. Players still sign up with the email

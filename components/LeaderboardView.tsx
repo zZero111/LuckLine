@@ -5,7 +5,10 @@ import type { Database } from "@/lib/database.types";
 import { useAuth } from "@/lib/supabase/auth-context";
 import { createClient } from "@/lib/supabase/client";
 import { AVATAR_BUCKET } from "@/lib/avatars";
+import { auraSpec } from "@/lib/game/cosmetics";
 import { Avatar } from "./Avatar";
+import { BadgeAura } from "./BadgeAura";
+import { PlayerName } from "./PlayerName";
 import { Chip } from "./Chip";
 import { PlayerStatsModal } from "./PlayerStatsModal";
 import { SignInPrompt } from "./SignInPrompt";
@@ -68,12 +71,18 @@ function Tabs({ tab, onChange }: { tab: "today" | "all"; onChange: (t: "today" |
 function PlayerCell({
   name,
   avatarPath,
+  aura,
+  frame,
+  nameStyle,
   isAdmin,
   onRemoved,
   onOpen,
 }: {
   name: string | null;
   avatarPath: string | null;
+  aura?: string | null;
+  frame?: string | null;
+  nameStyle?: string | null;
   isAdmin: boolean;
   onRemoved: () => void;
   onOpen: (name: string) => void;
@@ -89,7 +98,8 @@ function PlayerCell({
     if (error) window.alert("Couldn't remove that picture.");
     else onRemoved();
   }
-  return (
+  const spec = auraSpec(aura, 0.6);
+  const cell = (
     <span className="flex items-center gap-2">
       <button
         type="button"
@@ -97,8 +107,8 @@ function PlayerCell({
         className="flex min-w-0 items-center gap-2 rounded-lg text-left hover:text-violet-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-violet-500"
         title="See stats"
       >
-        <Avatar path={avatarPath} name={name} size={28} />
-        <span className="truncate underline decoration-zinc-700 decoration-dotted underline-offset-4">{name}</span>
+        <Avatar path={avatarPath} name={name} size={28} frame={frame} />
+        <PlayerName name={name} style={nameStyle} className="truncate underline decoration-zinc-700 decoration-dotted underline-offset-4" />
       </button>
       {isAdmin && avatarPath && (
         <button
@@ -112,6 +122,13 @@ function PlayerCell({
         </button>
       )}
     </span>
+  );
+  return spec ? (
+    <BadgeAura spec={spec} className="inline-block rounded-xl px-2 py-0.5">
+      {cell}
+    </BadgeAura>
+  ) : (
+    cell
   );
 }
 
@@ -205,7 +222,7 @@ export function LeaderboardView() {
                       <Rank rank={r.rank} />
                     </td>
                     <td className={`${td} font-medium`}>
-                      <PlayerCell name={r.display_name} avatarPath={r.avatar_path} isAdmin={isAdmin} onRemoved={() => setReload((n) => n + 1)} onOpen={setOpenName} />
+                      <PlayerCell name={r.display_name} avatarPath={r.avatar_path} aura={r.aura} frame={r.frame} nameStyle={r.name_style} isAdmin={isAdmin} onRemoved={() => setReload((n) => n + 1)} onOpen={setOpenName} />
                     </td>
                     <td className={`${td} text-right font-mono tabular-nums`}>{r.number != null ? formatNumber(r.number) : ""}</td>
                     <td className={`${td} text-right tabular-nums text-violet-300`}>
@@ -244,7 +261,7 @@ export function LeaderboardView() {
                     <Rank rank={r.rank} />
                   </td>
                   <td className={`${td} font-medium`}>
-                    <PlayerCell name={r.display_name} avatarPath={r.avatar_path} isAdmin={isAdmin} onRemoved={() => setReload((n) => n + 1)} onOpen={setOpenName} />
+                    <PlayerCell name={r.display_name} avatarPath={r.avatar_path} aura={r.aura} frame={r.frame} nameStyle={r.name_style} isAdmin={isAdmin} onRemoved={() => setReload((n) => n + 1)} onOpen={setOpenName} />
                   </td>
                   <td className={`${td} text-right tabular-nums text-violet-300`}>{r.total_ep != null ? formatNumber(r.total_ep) : ""}</td>
                   <td className={`${td} text-right tabular-nums`}>{r.best_ep != null ? formatNumber(r.best_ep) : ""}</td>
